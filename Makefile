@@ -1,0 +1,171 @@
+
+### `Makefile`
+```makefile
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+MANDIR ?= $(PREFIX)/share/man/man1
+CONFDIR ?= /etc/netsnmp
+CACHEDIR ?= /var/cache/netsnmp
+LOGDIR ?= /var/log
+
+VERSION = 2.0.0
+BUILD_DATE = $(shell date +%Y-%m-%d)
+
+.PHONY: all install uninstall clean test deb rpm arch snap flatpak
+
+all: netsnmp installer
+
+# Build the main executable by bundling all modules
+netsnmp: src/core/main.sh src/core/*.sh
+	@echo "Building NetSnmp Enterprise $(VERSION)"
+	@cat src/core/main.sh > netsnmp.tmp
+	@for module in src/core/config.sh src/core/scanner.sh src/core/cache.sh src/core/utils.sh src/core/logging.sh; do \
+		sed '1d;$$d' $$module >> netsnmp.tmp; \
+	done
+	@echo "main \"\$$@\"" >> netsnmp.tmp
+	@mv netsnmp.tmp netsnmp
+	@chmod +x netsnmp
+	@echo "Build complete: netsnmp"
+
+install: netsnmp
+	@echo "Installing NetSnmp Enterprise to $(DESTDIR)$(PREFIX)"
+	@install -d $(DESTDIR)$(BINDIR)
+	@install -d $(DESTDIR)$(MANDIR)
+	@install -d $(DESTDIR)$(CONFDIR)
+	@install -d $(DESTDIR)$(CACHEDIR)
+	@install -m 755 netsnmp $(DESTDIR)$(BINDIR)/netsnmp
+	@install -m 644 man/netsnmp.1 $(DESTDIR)$(MANDIR)/netsnmp.1
+	@install -m 644 config/netsnmp.conf $(DESTDIR)$(CONFDIR)/netsnmp.conf
+	@echo "Installation complete"
+
+uninstall:
+	@echo "Uninstalling NetSnmp Enterprise"
+	@rm -f $(DESTDIR)$(BINDIR)/netsnmp
+	@rm -f $(DESTDIR)$(MANDIR)/netsnmp.1.gz
+	@rm -rf $(DESTDIR)$(CONFDIR)
+	@rm -rf $(DESTDIR)$(CACHEDIR)
+	@echo "Uninstall complete"
+
+installer:
+	@echo "Building installer..."
+	@cat src/install/installer.sh > installer.tmp
+	@for module in src/install/dependencies.sh src/install/postinstall.sh; do \
+		sed '1d;$$d' $$module >> installer.tmp; \
+	done
+	@echo "main \"\$$@\"" >> installer.tmp
+	@mv installer.tmp netsnmp-installer
+	@chmod +x netsnmp-installer
+	@echo "Installer built: netsnmp-installer"
+
+install-system: netsnmp
+	sudo ./netsnmp-installer --system
+
+install-user: netsnmp
+	./netsnmp-installer --user
+
+clean:
+	@rm -f netsnmp
+	@rm -f *.deb *.rpm *.tar.gz
+	@echo "Clean complete"
+
+test:
+	@echo "Running tests..."
+	@cd src/tests && ./run_tests.sh
+
+packages: deb rpm arch
+
+deb:
+	@echo "Building Debian package..."
+	@cd packaging/deb && ./build.sh
+
+rpm:
+	@echo "Building RPM package..."
+	@cd packaging/rpm && ./build.sh
+
+arch:
+	@echo "Building Arch Linux package..."
+	@cd packaging/arch && ./build.sh
+
+snap:
+	@echo "Building Snap package..."
+	@cd packaging/snap && ./build.sh
+
+flatpak:
+	@echo "Building Flatpak package..."
+	@cd packaging/flatpak && ./build.sh
+
+clean-packages:
+	@echo "Cleaning package artifacts..."
+	@rm -f packaging/*/*.deb
+	@rm -f packaging/*/*.rpm
+	@rm -f packaging/*/*.pkg.tar.*
+	@rm -f packaging/*/*.snap
+	@rm -f packaging/*/*.flatpak
+	@rm -f packaging/*/*.tar.gz
+	@rm -rf packaging/deb/debian
+	@rm -rf packaging/rpm/rpmbuild
+	@rm -rf packaging/arch/{src,pkg}
+	@rm -rf packaging/snap/{prime,stage,parts}
+	@rm -rf packaging/flatpak/build-dir
+	@rm -rf packaging/flatpak/.flatpak-builder
+
+clean: clean-packages
+	@rm -f netsnmp
+	@rm -f netsnmp-installer
+	@echo "Clean complete"
+
+release-patch:
+	@./scripts/release-manager.sh patch
+
+release-minor:
+	@./scripts/release-manager.sh minor
+
+release-major:
+	@./scripts/release-manager.sh major
+
+version:
+	@./scripts/release-manager.sh version
+
+gpg-setup:
+	@./scripts/gpg-setup.sh setup
+
+gpg-sign-deb:
+	@./scripts/gpg-setup.sh sign-deb packaging/deb/*.deb
+
+gpg-sign-rpm:
+	@./scripts/gpg-setup.sh sign-rpm packaging/rpm/*.rpm
+
+gpg-github:
+	@./scripts/gpg-setup.sh github
+
+# Repository distribution
+setup-ppa:
+	@./scripts/setup-ppa.sh
+
+setup-copr:
+	@./scripts/setup-copr.sh
+
+setup-aur:
+	@./scripts/setup-aur.sh
+
+# CI/CD helpers
+ci-build:
+	@make clean
+	@make
+	@make test
+
+ci-packages:
+	@make deb
+	@make rpm
+	@make arch
+
+ci-release:
+	@make ci-build
+	@make ci-packages
+	@make gpg-sign-deb
+	@make gpg-sign-rpm
+
+.PHONY: version
+version:
+	@echo "NetSnmp Enterprise v$(VERSION)"
+	@echo "Build date: $(BUILD_DATE)"

@@ -1,0 +1,40 @@
+# Build artifacts
+/netsnmp
+*.tmp
+*.tar.gz
+*.deb
+*.rpm
+*.pkg.tar.zst
+
+# Distribution packages
+/packaging/*/*.deb
+/packaging/*/*.rpm
+/packaging/*/*.tar.*
+/packaging/*/build/
+/packaging/*/pkgs/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*~
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+/test-results/
+/coverage/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Backup files
+*.bak
+*.backup

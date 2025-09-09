@@ -1,0 +1,62 @@
+name: netsnmp-enterprise
+version: '2.0.0'
+summary: Enterprise-grade network discovery tool
+description: |
+  NetSnmp Enterprise is a powerful network device discovery tool
+  that uses ICMP ping and SNMP protocols to discover and inventory
+  network devices across your infrastructure.
+
+grade: stable
+confinement: strict
+base: core20
+
+apps:
+  netsnmp:
+    command: bin/netsnmp
+    plugs:
+      - network
+      - network-bind
+      - home
+      - removable-media
+    environment:
+      PATH: $SNAP/usr/sbin:$SNAP/usr/bin:$SNAP/sbin:$SNAP/bin:$PATH
+      LD_LIBRARY_PATH: $SNAP_LIBRARY_PATH:$LD_LIBRARY_PATH
+
+parts:
+  netsnmp:
+    plugin: dump
+    source: .
+    organize:
+      netsnmp: bin/netsnmp
+      man/netsnmp.1: share/man/man1/netsnmp.1
+      config/netsnmp.conf: etc/netsnmp/netsnmp.conf
+    stage:
+      - bin/netsnmp
+      - share/man/man1/netsnmp.1
+      - etc/netsnmp/netsnmp.conf
+    build-packages:
+      - make
+      - gcc
+    prime:
+      - bin/netsnmp
+      - share/man/man1/netsnmp.1
+      - etc/netsnmp/netsnmp.conf
+
+  snmp-tools:
+    plugin: nil
+    stage-packages:
+      - snmp
+      - snmpd
+      - fping
+      - parallel
+
+  core-deps:
+    plugin: nil
+    stage-packages:
+      - curl
+      - iputils-ping
+
+slots:
+  network:
+    interface: network
+    bind: network

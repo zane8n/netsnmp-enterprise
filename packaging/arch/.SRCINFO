@@ -1,0 +1,12 @@
+pkgbase = netsnmp-enterprise
+	pkgdesc = Enterprise-grade network discovery tool
+	pkgver = 2.0.0
+	pkgrel = 1
+	url = https://github.com/zane8n/netsnmp-enterprise
+	arch = any
+	license = GPL3
+	depends = net-snmp
+	depends = iputils
+	depends = fping
+	depends = parallel
+	depends = curl

@@ -1,0 +1,33 @@
+app-id: com.zane8n.netsnmp
+runtime: org.freedesktop.Platform
+runtime-version: '22.08'
+sdk: org.freedesktop.Sdk
+base: org.freedesktop.Sdk
+command: netsnmp
+
+finish-args:
+  - --share=network
+  - --socket=fallback-x11
+  - --filesystem=home
+  - --filesystem=host
+
+modules:
+  - name: netsnmp
+    buildsystem: simple
+    build-commands:
+      - make
+      - make install DESTDIR=/app
+    sources:
+      - type: archive
+        url: https://github.com/zane8n/netsnmp-enterprise/archive/v2.0.0.tar.gz
+        sha256: SKIP
+
+  - name: dependencies
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 /usr/bin/snmpget /app/bin/snmpget
+      - install -Dm755 /usr/bin/ping /app/bin/ping
+    sources:
+      - type: extra-data
+        filename: netsnmp-deps.tar.gz
+        only-arches: [x86_64]
