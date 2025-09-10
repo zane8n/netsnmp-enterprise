@@ -47,12 +47,15 @@ else
     exit 1
 fi
 
-# Test config validation
+# Test config validation - check if ping_timeout is numeric
 echo "3. Testing configuration validation..."
 if [[ -n "${CONFIG[ping_timeout]}" ]] && [[ "${CONFIG[ping_timeout]}" =~ ^[0-9]+$ ]]; then
     echo "   ✅ Config validation passed"
+    echo "   ✅ Ping timeout: ${CONFIG[ping_timeout]}"
 else
     echo "   ❌ Config validation failed"
+    echo "   ❌ Ping timeout value: '${CONFIG[ping_timeout]}'"
+    echo "   ❌ Expected numeric value, got: $(echo "${CONFIG[ping_timeout]}" | od -c)"
     exit 1
 fi
 

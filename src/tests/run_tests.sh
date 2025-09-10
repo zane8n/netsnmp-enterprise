@@ -7,6 +7,11 @@ echo "==========================================="
 # Set test mode
 export TEST_MODE="true"
 
+# First run debug to see what's happening
+echo "Running configuration debug..."
+./debug_config.sh
+echo ""
+
 # Run configuration tests
 echo "Running configuration tests..."
 ./test_config.sh

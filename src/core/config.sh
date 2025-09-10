@@ -22,13 +22,24 @@ fi
 CACHE_FILE="${CACHE_DIR}/hosts.cache"
 CONFIG_FILE="${CONFIG_DIR}/netsnmp.conf"
 
+# Default configuration
+declare -A CONFIG=(
+    ["subnets"]=""
+    ["communities"]=""
+    ["ping_timeout"]="1"
+    ["snmp_timeout"]="2"
+    ["scan_workers"]="10"
+    ["cache_ttl"]="3600"
+    ["enable_logging"]="true"
+)
+
 # Initialize configuration
 init_config() {
     mkdir -p "$CONFIG_DIR"
     mkdir -p "$CACHE_DIR"
     mkdir -p "$(dirname "$LOG_FILE")"
     
-    # Create default config if it doesn't exist
+    # Create default config if it doesn't exist or is empty
     if [[ ! -f "$CONFIG_FILE" ]] || [[ ! -s "$CONFIG_FILE" ]]; then
         create_default_config
     fi
@@ -66,7 +77,7 @@ enable_logging="true"
 EOF
     
     # Set permissions if root
-    if [[ $EUID -eq 0 ]]; then
+    if [[ $EUID -eq 0 ]] && [[ "$TEST_MODE" != "true" ]]; then
         chmod 644 "$CONFIG_FILE" 2>/dev/null
     fi
     
@@ -81,17 +92,26 @@ load_config() {
             CONFIG["$key"]=""
         done
         
-        # Read config file
-        while IFS='=' read -r key value; do
-            # Skip comments and empty lines
-            [[ $key =~ ^# ]] || [[ -z $key ]] && continue
+        # Read config file line by line
+        while IFS= read -r line; do
+            # Skip comments, empty lines, and malformed lines
+            [[ "$line" =~ ^# ]] && continue
+            [[ -z "$line" ]] && continue
+            [[ "$line" != *"="* ]] && continue
             
-            # Clean up key and value
+            # Extract key and value
+            local key="${line%%=*}"
+            local value="${line#*=}"
+            
+            # Remove quotes and trim spaces
             key=$(echo "$key" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
             value=$(echo "$value" | sed -e 's/^[[:space:]]*//; s/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
             
-            # Store in config array
-            CONFIG["$key"]="$value"
+            # Store in config array if it's a known key
+            if [[ -n "${CONFIG[$key]+_}" ]]; then
+                CONFIG["$key"]="$value"
+            fi
+            
         done < "$CONFIG_FILE"
         
         log_debug "Configuration loaded from: $CONFIG_FILE"
