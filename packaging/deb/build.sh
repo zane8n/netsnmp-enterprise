@@ -16,16 +16,12 @@ if ! command -v dh >/dev/null 2>&1; then
     exit 1
 fi
 
-# Get the absolute path to the project root
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Clean previous builds (but don't use make clean)
 rm -rf ../*.deb ../*.buildinfo ../*.changes ../*.dsc
 rm -rf debian/netsnmp-enterprise debian/.debhelper debian/files debian/debhelper-build-stamp
 
 # Build the Debian package directly (dh_auto_build in rules will handle the build)
-cd "$SCRIPT_DIR"
 dpkg-buildpackage -uc -us -b
 
 # Check if package was built successfully
