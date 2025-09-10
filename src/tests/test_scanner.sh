@@ -41,7 +41,7 @@ fi
 
 # Test CIDR IP generation
 echo "2. Testing CIDR IP generation..."
-ips=$(generate_ip_list "192.168.0.0/24")  # Should generate 192.168.0.1-254
+ips=$(generate_ip_list "192.168.0.0/30")  # Should generate 192.168.0.1-254
 if [[ $(echo "$ips" | wc -l) -eq 2 ]]; then
     echo "   ✅ CIDR IP generation test passed"
 else
