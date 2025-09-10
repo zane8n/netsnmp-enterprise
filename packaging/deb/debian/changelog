@@ -1,0 +1,9 @@
+netsnmp-enterprise (2.0.0) stable; urgency=medium
+
+  * Initial release of NetSnmp Enterprise
+  - Complete network discovery system
+  - Multi-distribution support
+  - Automated dependency management
+  - Comprehensive caching and logging
+
+ -- NetSnmp Team <safarikikandi@gmail.com>  $(date -R)

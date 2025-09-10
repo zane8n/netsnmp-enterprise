@@ -1,0 +1,17 @@
+#!/bin/bash
+# Pre-removal script for NetSnmp Enterprise
+
+set -e
+
+echo "NetSnmp Enterprise pre-removal cleanup..."
+
+# Stop systemd services if they exist
+if systemctl is-active --quiet netsnmp.timer 2>/dev/null; then
+    systemctl stop netsnmp.timer
+fi
+
+if systemctl is-enabled --quiet netsnmp.timer 2>/dev/null; then
+    systemctl disable netsnmp.timer
+fi
+
+echo "Pre-removal cleanup completed."

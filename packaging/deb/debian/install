@@ -1,0 +1,4 @@
+usr/local/bin/netsnmp usr/bin
+usr/local/share/man/man1/netsnmp.1.gz usr/share/man/man1
+etc/netsnmp/netsnmp.conf etc/netsnmp
+var/cache/netsnmp var/cache

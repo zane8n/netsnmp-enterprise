@@ -40,40 +40,40 @@ jobs:
         name: deb-package
         path: packaging/deb/*.deb
 
-  package-rpm:
-    runs-on: centos-8
-    needs: build
-    if: github.ref == 'refs/heads/main'
+  # package-rpm:
+  #   runs-on: centos-8
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main'
     
-    steps:
-    - uses: actions/checkout@v3
+  #   steps:
+  #   - uses: actions/checkout@v3
     
-    - name: Build RPM package
-      run: |
-        sudo yum install -y make rpm-build
-        make rpm
+  #   - name: Build RPM package
+  #     run: |
+  #       sudo yum install -y make rpm-build
+  #       make rpm
     
-    - name: Upload RPM package
-      uses: actions/upload-artifact@v4
-      with:
-        name: rpm-package
-        path: packaging/rpm/*.rpm
+  #   - name: Upload RPM package
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: rpm-package
+  #       path: packaging/rpm/*.rpm
 
-  package-arch:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
+  # package-arch:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main'
     
-    steps:
-    - uses: actions/checkout@v3
+  #   steps:
+  #   - uses: actions/checkout@v3
     
-    - name: Build Arch Linux package using Docker
-      uses: docker://archlinux:latest
-      with:
-        args: sh -c "pacman -Sy --noconfirm make binutils fakeroot && make arch"
+  #   - name: Build Arch Linux package using Docker
+  #     uses: docker://archlinux:latest
+  #     with:
+  #       args: sh -c "pacman -Sy --noconfirm make binutils fakeroot && make arch"
     
-    - name: Upload Arch Linux package
-      uses: actions/upload-artifact@v4
-      with:
-        name: arch-package
-        path: packaging/arch/*.pkg.tar.*
+  #   - name: Upload Arch Linux package
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: arch-package
+  #       path: packaging/arch/*.pkg.tar.*
