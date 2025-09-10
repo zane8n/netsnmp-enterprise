@@ -204,4 +204,18 @@ run_test_scan() {
     fi
     
     if [[ -n "${CONFIG[communities]}" ]]; then
-        echo "   ✅ SNMP communities:
+        echo "   ✅ SNMP communities: ${CONFIG[communities]}"
+    else
+        echo "   ❌ No SNMP communities configured"
+    fi
+    
+    echo "4. Testing single host scan..."
+    if scan_single_host "127.0.0.1" &>/dev/null; then
+        echo "   ✅ Single host scan: OK"
+    else
+        echo "   ⚠️  Single host scan: No response (expected for localhost)"
+    fi
+    
+    echo ""
+    echo "Test scan completed."
+}
