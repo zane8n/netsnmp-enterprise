@@ -1,10 +1,14 @@
-Package: netsnmp-enterprise
-Version: 2.0.0
+Source: netsnmp-enterprise
 Section: net
 Priority: optional
+Maintainer: zane8n <safarikikandi@gmail.com>
+Build-Depends: debhelper (>= 9), dh-systemd
+Standards-Version: 3.9.8
+Homepage: https://github.com/zane8n/netsnmp-enterprise
+
+Package: netsnmp-enterprise
 Architecture: all
 Depends: snmp, snmpd, iputils-ping, fping, parallel, curl
-Maintainer: zane8n <safarikikandi@gmail.com>
 Description: Enterprise-grade network discovery tool
  NetSnmp Enterprise is a powerful network device discovery tool that uses
  ICMP ping and SNMP protocols to discover and inventory network devices.
@@ -15,4 +19,3 @@ Description: Enterprise-grade network discovery tool
   - Comprehensive caching system
   - Parallel scanning capabilities
   - Automated network inventory
-Homepage: https://github.com/zane8n/netsnmp-enterprise

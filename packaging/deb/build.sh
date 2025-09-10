@@ -16,12 +16,23 @@ if ! command -v dh >/dev/null 2>&1; then
     exit 1
 fi
 
+# Change to the debian packaging directory
+cd packaging/deb
 
-# Clean previous builds (but don't use make clean)
+# Create debian directory structure if it doesn't exist
+if [ ! -d "debian" ]; then
+    mkdir -p debian
+fi
+
+
+# Fix the changelog date (replace $(date -R) with actual date)
+sed -i "s/\$(date -R)/$(date -R)/g" debian/changelog
+
+# Clean previous builds
 rm -rf ../*.deb ../*.buildinfo ../*.changes ../*.dsc
 rm -rf debian/netsnmp-enterprise debian/.debhelper debian/files debian/debhelper-build-stamp
 
-# Build the Debian package directly (dh_auto_build in rules will handle the build)
+# Build the Debian package
 dpkg-buildpackage -uc -us -b
 
 # Check if package was built successfully
