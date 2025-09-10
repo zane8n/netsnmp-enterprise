@@ -50,12 +50,38 @@ if [[ -f ../netsnmp-enterprise_2.0.0_all.deb ]]; then
     # Test installation
     echo ""
     echo "Testing installation..."
-    if sudo dpkg -i ../netsnmp-enterprise_2.0.0_all.deb; then
-        echo "✅ Installation test successful"
-        sudo dpkg -r netsnmp-enterprise
+if [[ -f ../netsnmp-enterprise_2.0.0_all.deb ]]; then
+    echo ""
+    echo "✅ Debian package built successfully:"
+    echo "   ../netsnmp-enterprise_2.0.0_all.deb"
+    
+    # Show package info
+    echo ""
+    echo "Package information:"
+    dpkg-deb -I ../netsnmp-enterprise_2.0.0_all.deb
+    
+    # Test installation - handle CI environments without sudo
+    echo ""
+    echo "Testing package..."
+    if command -v sudo >/dev/null 2>&1; then
+        # Local environment with sudo
+        if sudo dpkg -i ../netsnmp-enterprise_2.0.0_all.deb; then
+            echo "✅ Installation test successful"
+            sudo dpkg -r netsnmp-enterprise
+        else
+            echo "❌ Installation test failed"
+            exit 1
+        fi
     else
-        echo "❌ Installation test failed"
-        exit 1
+        # CI environment - validate package structure instead
+        echo "⚠️  sudo not available, validating package structure..."
+        if dpkg-deb -I ../netsnmp-enterprise_2.0.0_all.deb >/dev/null && \
+           dpkg-deb -c ../netsnmp-enterprise_2.0.0_all.deb | grep -q "usr/bin/netsnmp"; then
+            echo "✅ Package validation successful"
+        else
+            echo "❌ Package validation failed"
+            exit 1
+        fi
     fi
 else
     echo "❌ Package build failed"
