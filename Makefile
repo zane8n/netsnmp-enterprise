@@ -111,7 +111,7 @@ clean-packages:
 	@rm -rf packaging/flatpak/build-dir
 	@rm -rf packaging/flatpak/.flatpak-builder
 
-clean: clean-packages
+clean:
 	@rm -f netsnmp
 	@rm -f netsnmp-installer
 	@echo "Clean complete"
