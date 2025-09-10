@@ -16,8 +16,7 @@ if ! command -v dh >/dev/null 2>&1; then
     exit 1
 fi
 
-# Change to the debian packaging directory
-cd packaging/deb
+
 
 # Create debian directory structure if it doesn't exist
 if [ ! -d "debian" ]; then
