@@ -119,7 +119,7 @@ cd packaging
 debuild -S -sa
 
 # Upload to PPA
-dput ppa:your-username/netsnmp ../netsnmp-enterprise_2.0.0-1_source.changes
+dput ppa:ky6/netsnmp ../netsnmp-enterprise_2.0.0-1_source.changes
 ```
 
 ### Fedora COPR
@@ -156,7 +156,7 @@ git push
 gpg --full-generate-key
 
 # Export public key
-gpg --export --armor your-email@example.com > packaging/public-key.asc
+gpg --export --armor safarikikandi@gmail.com > packaging/public-key.asc
 
 # Sign Debian package
 debsign -k YOUR_KEY_ID ../netsnmp-enterprise_2.0.0-1_source.changes

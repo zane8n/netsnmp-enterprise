@@ -30,7 +30,8 @@ setup-scripts:
 	@chmod +x packaging/rpm/build.sh
 	@chmod +x packaging/arch/build.sh
 	@chmod +x scripts/*.sh
-	@chmod +x src/tests/run_tests.sh
+	@chmod +x src/tests/*.sh
+
 	@echo "Script permissions set"
 
 install: netsnmp
