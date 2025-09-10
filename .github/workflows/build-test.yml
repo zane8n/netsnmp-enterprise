@@ -1,0 +1,90 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro: [ubuntu-22.04, ubuntu-20.04, centos-8, centos-7]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup ${{ matrix.distro }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install build tools
+      run: |
+        if [[ "${{ matrix.distro }}" == "ubuntu"* ]]; then
+          sudo apt-get update
+          sudo apt-get install -y make build-essential
+        elif [[ "${{ matrix.distro }}" == "centos"* ]]; then
+          sudo yum install -y make gcc
+        fi
+
+    - name: Build NetSnmp
+      run: |
+        make
+        ls -la netsnmp
+
+    - name: Run tests
+      run: |
+        cd src/tests
+        chmod +x run_tests.sh
+        ./run_tests.sh
+
+    - name: Test installation
+      run: |
+        sudo make install
+        netsnmp --version
+        netsnmp --help | head -10
+
+  test-packages:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build packages
+      run: |
+        make deb
+        make rpm
+        ls -la packaging/deb/ packaging/rpm/
+
+    - name: Test package installation
+      run: |
+        # Test Debian package
+        if sudo dpkg -i packaging/deb/*.deb; then
+          echo "✅ Debian package installed successfully"
+          netsnmp --version
+          sudo dpkg -r netsnmp-enterprise
+        else
+          echo "❌ Debian package installation failed"
+          exit 1
+        fi
+
+        # Test RPM package (using alien for conversion)
+        sudo apt-get install -y alien
+        sudo alien -r packaging/deb/*.deb
+        if sudo rpm -ivh *.rpm; then
+          echo "✅ RPM package installed successfully"
+          netsnmp --version
+          sudo rpm -e netsnmp-enterprise
+        else
+          echo "❌ RPM package installation failed"
+          exit 1
+        fi

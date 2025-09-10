@@ -34,8 +34,8 @@ tar czf ../packaging/flatpak/netsnmp-enterprise-2.0.0.tar.gz --exclude=.git --ex
 
 # Build the Flatpak
 cd packaging/flatpak
-flatpak-builder --force-clean build-dir com.example.netsnmp.yaml
-flatpak build-bundle build-dir netsnmp-enterprise.flatpak com.example.netsnmp
+flatpak-builder --force-clean build-dir com.zane8n.netsnmp.yaml
+flatpak build-bundle build-dir netsnmp-enterprise.flatpak com.zane8n.netsnmp
 
 # Check if package was built successfully
 if [[ -f netsnmp-enterprise.flatpak ]]; then

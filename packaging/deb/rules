@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	# Clean build artifacts
+
+override_dh_auto_build:
+	# Build the application
+	make
+
+override_dh_auto_install:
+	# Install files to package directory
+	make install DESTDIR=debian/netsnmp-enterprise
+
+override_dh_install:
+	# Additional installation steps
+	dh_install
+
+override_dh_installdocs:
+	# Install documentation
+	dh_installdocs
+	install -d debian/netsnmp-enterprise/usr/share/doc/netsnmp-enterprise
+	install -m 644 ../../docs/INSTALL.md debian/netsnmp-enterprise/usr/share/doc/netsnmp-enterprise/
+	install -m 644 ../../README.md debian/netsnmp-enterprise/usr/share/doc/netsnmp-enterprise/
+
+override_dh_fixperms:
+	# Fix permissions
+	dh_fixperms
+	chmod 755 debian/netsnmp-enterprise/usr/local/bin/netsnmp
+
+override_dh_auto_test:
+	# Run tests
+	make test

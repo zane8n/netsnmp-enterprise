@@ -1,6 +1,3 @@
-
-### `Makefile`
-```makefile
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man/man1
@@ -11,7 +8,7 @@ LOGDIR ?= /var/log
 VERSION = 2.0.0
 BUILD_DATE = $(shell date +%Y-%m-%d)
 
-.PHONY: all install uninstall clean test deb rpm arch snap flatpak
+.PHONY: all install uninstall clean test deb rpm arch snap flatpak setup-scripts
 
 all: netsnmp installer
 
@@ -26,6 +23,15 @@ netsnmp: src/core/main.sh src/core/*.sh
 	@mv netsnmp.tmp netsnmp
 	@chmod +x netsnmp
 	@echo "Build complete: netsnmp"
+
+setup-scripts:
+	@echo "Setting up script permissions..."
+	@chmod +x packaging/deb/build.sh
+	@chmod +x packaging/rpm/build.sh
+	@chmod +x packaging/arch/build.sh
+	@chmod +x scripts/*.sh
+	@chmod +x src/tests/run_tests.sh
+	@echo "Script permissions set"
 
 install: netsnmp
 	@echo "Installing NetSnmp Enterprise to $(DESTDIR)$(PREFIX)"
@@ -63,16 +69,11 @@ install-system: netsnmp
 install-user: netsnmp
 	./netsnmp-installer --user
 
-clean:
-	@rm -f netsnmp
-	@rm -f *.deb *.rpm *.tar.gz
-	@echo "Clean complete"
-
-test:
+test: setup-scripts
 	@echo "Running tests..."
 	@cd src/tests && ./run_tests.sh
 
-packages: deb rpm arch
+packages: setup-scripts deb rpm arch
 
 deb:
 	@echo "Building Debian package..."
@@ -166,6 +167,3 @@ ci-release:
 	@make gpg-sign-rpm
 
 .PHONY: version
-version:
-	@echo "NetSnmp Enterprise v$(VERSION)"
-	@echo "Build date: $(BUILD_DATE)"
