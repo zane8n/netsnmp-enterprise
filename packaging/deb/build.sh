@@ -27,7 +27,9 @@ fi
 # Fix the changelog date (replace $(date -R) with actual date)
 sed -i "s/\$(date -R)/$(date -R)/g" debian/changelog
 
-# Clean previous builds
+chmod +x debian/rules
+
+# Clean previous builds (but preserve debian/ directory)
 rm -rf ../*.deb ../*.buildinfo ../*.changes ../*.dsc
 rm -rf debian/netsnmp-enterprise debian/.debhelper debian/files debian/debhelper-build-stamp
 
