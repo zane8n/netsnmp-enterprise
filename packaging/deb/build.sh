@@ -56,7 +56,7 @@ if [[ -f ../netsnmp-enterprise_2.0.0_all.deb ]]; then
     echo "Testing package..."
     if command -v sudo >/dev/null 2>&1; then
         # Local environment with sudo
-        if sudo dpkg -i ../netsnmp-enterprise_2.0.0_all.deb; then
+        if sudo dpkg -i netsnmp-enterprise_2.0.0_all.deb; then
             echo "✅ Installation test successful"
             sudo dpkg -r netsnmp-enterprise
         else
@@ -66,8 +66,8 @@ if [[ -f ../netsnmp-enterprise_2.0.0_all.deb ]]; then
     else
         # CI environment - validate package structure instead
         echo "⚠️  sudo not available, validating package structure..."
-        if dpkg-deb -I ../netsnmp-enterprise_2.0.0_all.deb >/dev/null && \
-           dpkg-deb -c ../netsnmp-enterprise_2.0.0_all.deb | grep -q "usr/bin/netsnmp"; then
+        if dpkg-deb -I netsnmp-enterprise_2.0.0_all.deb >/dev/null && \
+           dpkg-deb -c netsnmp-enterprise_2.0.0_all.deb | grep -q "usr/bin/netsnmp"; then
             echo "✅ Package validation successful"
         else
             echo "❌ Package validation failed"
