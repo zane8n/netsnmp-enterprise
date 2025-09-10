@@ -42,10 +42,13 @@ if [[ -f ../netsnmp-enterprise_2.0.0_all.deb ]]; then
     echo "✅ Debian package built successfully:"
     echo "   ../netsnmp-enterprise_2.0.0_all.deb"
     
+    mv ../netsnmp-enterprise_2.0.0_all.deb .
+    echo "Moved package to: $(pwd)/netsnmp-enterprise_2.0.0_all.deb"
+    
     # Show package info
     echo ""
     echo "Package information:"
-    dpkg-deb -I ../netsnmp-enterprise_2.0.0_all.deb
+    dpkg-deb -I netsnmp-enterprise_2.0.0_all.deb
     
 
     # Test installation - handle CI environments without sudo
