@@ -35,7 +35,7 @@ jobs:
         args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
     
     - name: Upload Debian package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: deb-package
         path: packaging/deb/*.deb
@@ -54,7 +54,7 @@ jobs:
         make rpm
     
     - name: Upload RPM package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: rpm-package
         path: packaging/rpm/*.rpm
@@ -73,7 +73,7 @@ jobs:
         args: sh -c "pacman -Sy --noconfirm make binutils fakeroot && make arch"
     
     - name: Upload Arch Linux package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: arch-package
         path: packaging/arch/*.pkg.tar.*
