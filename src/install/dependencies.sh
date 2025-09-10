@@ -45,7 +45,8 @@ install_debian_deps() {
         fping \
         parallel \
         curl \
-        wget
+        wget \
+        prips
     
     print_success "Debian dependencies installed successfully"
 }
@@ -71,7 +72,8 @@ install_rpm_deps() {
             fping \
             parallel \
             curl \
-            wget
+            wget \
+            ipcalc
     else
         yum install -y \
             net-snmp \
@@ -80,7 +82,8 @@ install_rpm_deps() {
             fping \
             parallel \
             curl \
-            wget
+            wget \
+            ipcalc
     fi
     
     print_success "RPM dependencies installed successfully"
@@ -100,7 +103,8 @@ install_arch_deps() {
         fping \
         parallel \
         curl \
-        wget
+        wget \
+        ipcalc
     
     print_success "Arch dependencies installed successfully"
 }
@@ -119,7 +123,8 @@ install_suse_deps() {
         fping \
         parallel \
         curl \
-        wget
+        wget \
+        ipcalc
     
     print_success "SUSE dependencies installed successfully"
 }

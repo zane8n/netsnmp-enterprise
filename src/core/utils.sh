@@ -29,23 +29,115 @@ generate_ip_list() {
     
     log_debug "Generating IP list for: $network"
     
-    # Handle CIDR notation
+    # Handle CIDR notation (e.g., 10.134.7.0/24)
     if [[ "$network" == *"/"* ]]; then
+        # Use prips if available (most efficient)
+        if command -v prips >/dev/null 2>&1; then
+            prips "$network" 2>/dev/null
+            local exit_code=$?
+            if [[ $exit_code -eq 0 ]]; then
+                local count=$(prips "$network" 2>/dev/null | wc -l)
+                log_debug "Generated $count IPs for CIDR: $network (using prips)"
+                return 0
+            fi
+        fi
+        
+        # Use ipcalc if available
+        if command -v ipcalc >/dev/null 2>&1; then
+            local network_info=$(ipcalc -n -b "$network" 2>/dev/null)
+            if [[ $? -eq 0 ]]; then
+                local network_address=$(echo "$network_info" | awk '/^Network:/ {print $2}')
+                local broadcast=$(echo "$network_info" | awk '/^Broadcast:/ {print $2}')
+                
+                if [[ -n "$network_address" && -n "$broadcast" ]]; then
+                    # Use prips with network range if available
+                    if command -v prips >/dev/null 2>&1; then
+                        prips "$network_address" "$broadcast" | head -n -1 | tail -n +2
+                    else
+                        # Fallback: generate IPs manually for common subnet sizes
+                        local base="${network_address%.*}"
+                        local prefix="${network#*/}"
+                        
+                        case "$prefix" in
+                            24)
+                                for i in {1..254}; do
+                                    echo "${base}.${i}"
+                                done
+                                ;;
+                            25)
+                                for i in {1..126}; do
+                                    echo "${base}.${i}"
+                                done
+                                ;;
+                            26)
+                                for i in {1..62}; do
+                                    echo "${base}.${i}"
+                                done
+                                ;;
+                            27)
+                                for i in {1..30}; do
+                                    echo "${base}.${i}"
+                                done
+                                ;;
+                            28)
+                                for i in {1..14}; do
+                                    echo "${base}.${i}"
+                                done
+                                ;;
+                            29)
+                                for i in {1..6}; do
+                                    echo "${base}.${i}"
+                                done
+                                ;;
+                            30)
+                                for i in {1..2}; do
+                                    echo "${base}.${i}"
+                                done
+                                ;;
+                            *)
+                                log_error "Complex subnet mask not yet supported: /$prefix"
+                                return 1
+                                ;;
+                        esac
+                    fi
+                    
+                    local count=$(generate_ip_list "$network" | wc -l)
+                    log_debug "Generated $count IPs for CIDR: $network (using ipcalc)"
+                    return 0
+                fi
+            fi
+        fi
+        
+        # Fallback: manual CIDR handling for common cases
         local subnet="${network%/*}"
         local prefix="${network#*/}"
         
-        if [[ "$prefix" == "24" ]]; then
-            local base="${subnet%.*}"
-            for i in {1..254}; do
-                echo "${base}.${i}"
-            done
-            log_debug "Generated 254 IPs for CIDR: $network"
-        else
-            log_error "Complex subnet masks not yet supported: $network"
+        if ! [[ "$prefix" =~ ^[0-9]+$ ]]; then
+            log_error "Invalid CIDR prefix: $prefix"
             return 1
         fi
+        
+        # Only support common subnet sizes that we can handle manually
+        case "$prefix" in
+            24)
+                local base="${subnet%.*}"
+                for i in {1..254}; do
+                    echo "${base}.${i}"
+                done
+                log_debug "Generated 254 IPs for CIDR: $network"
+                ;;
+            25|26|27|28|29|30)
+                log_error "Complex subnet mask /$prefix requires prips or ipcalc"
+                log_error "Please install prips or ipcalc package"
+                return 1
+                ;;
+            *)
+                log_error "Complex subnet masks not yet supported: /$prefix"
+                return 1
+                ;;
+        esac
     
-    # Handle IP ranges
+    # Handle IP ranges (e.g., 10.134.7.1-100)
     elif [[ "$network" == *"-"* ]]; then
         local base_ip="${network%-*}"
         local end_range="${network#*-}"
@@ -69,7 +161,7 @@ generate_ip_list() {
         local count=$((end_range - last_octet + 1))
         log_debug "Generated $count IPs for range: $network"
     
-    # Handle single IP
+    # Handle single IP (e.g., 10.134.7.1)
     else
         if [[ "$network" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "$network"

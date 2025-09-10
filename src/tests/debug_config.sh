@@ -8,6 +8,8 @@ export LOG_FILE="/tmp/netsnmp-test/debug.log"
 mkdir -p "$CONFIG_DIR"
 rm -rf "$CONFIG_DIR"/*
 
+source "$(dirname "$0")/../core/utils.sh"
+source "$(dirname "$0")/../core/logging.sh"
 source "$(dirname "$0")/../core/config.sh"
 
 echo "=== DEBUG CONFIGURATION ==="
