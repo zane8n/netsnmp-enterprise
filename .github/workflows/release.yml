@@ -1,60 +1,98 @@
-name: Release
+name: Release and PPA Deployment
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  create-release:
+  build-and-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-
+    
+    - name: Setup build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y make devscripts debhelper dput build-essential
+        
     - name: Build all packages
       run: |
-        make clean
-        make
-        make deb
-        make rpm
-        make arch
-
-    - name: Create release
+        make packages
+        
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
           packaging/deb/*.deb
-          packaging/rpm/*.rpm
-          packaging/arch/*.pkg.tar.*
-          netsnmp
         generate_release_notes: true
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Upload to release
+        
+    - name: Build source package for PPA
       run: |
-        echo "Release created with packages:"
-        ls -la packaging/deb/ packaging/rpm/ packaging/arch/
+        cd packaging/deb
+        # Update changelog with release version
+        dch -v "${{ github.event.release.tag_name }}-1" "New upstream release"
+        dch -r --distribution stable ""
+        debuild -S -sa
+        
+    - name: Upload source package to release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          packaging/deb/../*.dsc
+          packaging/deb/../*.tar.*
+          packaging/deb/../*_source.changes
+        tag_name: ${{ github.event.release.tag_name }}
+        
+    - name: Store source package artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ppa-source-packages
+        path: |
+          packaging/deb/../*.dsc
+          packaging/deb/../*.tar.*
+          packaging/deb/../*_source.changes
 
-  notify:
+  deploy-ppa:
     runs-on: ubuntu-latest
-    needs: create-release
-    if: success()
+    needs: build-and-release
+    if: github.event.release.prerelease == false  # Only deploy to PPA for stable releases
     
     steps:
-    - name: Send notification
-      uses: 8398a7/action-slack@v3
+    - uses: actions/checkout@v3
+      
+    - name: Download source package artifacts
+      uses: actions/download-artifact@v4
       with:
-        status: ${{ job.status }}
-        channel: '#releases'
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        name: ppa-source-packages
+        
+    - name: Install dput
+      run: sudo apt-get update && sudo apt-get install -y dput
+        
+    - name: Deploy to PPA
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        PPA_URL: ${{ secrets.PPA_URL }}  # e.g., ppa:zane8n/netsnmp
+        PPA_GPG_KEY: ${{ secrets.PPA_GPG_KEY }}
+        PPA_GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
+      run: |
+        if [ -n "$PPA_URL" ] && [ -n "$PPA_GPG_KEY" ]; then
+          echo "Deploying to PPA: $PPA_URL"
+          
+          # Import GPG key
+          echo "$PPA_GPG_KEY" | gpg --import
+          
+          # Sign the changes file
+          debsign -k "$PPA_GPG_KEY" *.changes
+          
+          # Upload to PPA
+          dput "$PPA_URL" *.changes
+        else
+          echo "PPA credentials not set, skipping PPA deployment"
+          echo "Source packages are available in the release artifacts"
+        fi

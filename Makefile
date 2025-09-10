@@ -140,15 +140,34 @@ gpg-sign-rpm:
 gpg-github:
 	@./scripts/gpg-setup.sh github
 
+ppa-source:
+	@echo "Building source package for PPA..."
+	@cd packaging/deb && PPA_MODE=true ./build.sh
+
+ppa-configure:
+	@echo "Configuring PPA..."
+	@cd packaging/deb && ./../scripts/configure-ppa.sh $(VERSION)
+
+# Release targets
+release: clean test packages ppa-source
+	@echo "Release build complete"
+
+release-ppa: release
+	@echo "PPA release package ready in packaging/deb/"
+	
+ppa-setup:
+	@./scripts/setup-ppa.sh
+
+ppa-upload:
+	@if [ -z "$(PPA)" ]; then \
+		echo "Usage: make ppa-upload PPA=ppa:your-username/netsnmp"; \
+		exit 1; \
+	fi
+	@./scripts/upload-ppa.sh $(PPA)
+
 # Repository distribution
 setup-ppa:
 	@./scripts/setup-ppa.sh
-
-setup-copr:
-	@./scripts/setup-copr.sh
-
-setup-aur:
-	@./scripts/setup-aur.sh
 
 # CI/CD helpers
 ci-build:

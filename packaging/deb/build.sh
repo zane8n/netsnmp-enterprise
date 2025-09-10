@@ -5,6 +5,11 @@ set -e
 
 echo "Building Debian package for NetSnmp Enterprise..."
 
+# Check if we're building for PPA
+BUILD_SOURCE=${BUILD_SOURCE:-false}
+PPA_MODE=${PPA_MODE:-false}
+
+
 # Check if required tools are installed
 if ! command -v dpkg-buildpackage >/dev/null 2>&1; then
     echo "Error: dpkg-buildpackage not found. Install build-essential package."
@@ -34,10 +39,25 @@ rm -rf ../*.deb ../*.buildinfo ../*.changes ../*.dsc
 rm -rf debian/netsnmp-enterprise debian/.debhelper debian/files debian/debhelper-build-stamp
 
 # Build the Debian package
-dpkg-buildpackage -uc -us -b
+# Build the package
+if [ "$PPA_MODE" = "true" ] || [ "$BUILD_SOURCE" = "true" ]; then
+    echo "Building source package for PPA..."
+    debuild -S -sa
+else
+    echo "Building binary package..."
+    dpkg-buildpackage -uc -us -b
+fi
 
-# Check if package was built successfully
-if [[ -f ../netsnmp-enterprise_2.0.0_all.deb ]]; then
+
+# Handle the built packages
+if [ "$PPA_MODE" = "true" ] && [[ -f ../netsnmp-enterprise_*_source.changes ]]; then
+    echo "✅ PPA source package built successfully:"
+    ls -la ../*.dsc ../*.tar.* ../*_source.changes
+    
+    # Move source packages to current directory
+    mv ../*.dsc ../*.tar.* ../*_source.changes . 2>/dev/null || true
+    
+elif [[ -f ../netsnmp-enterprise_2.0.0_all.deb ]]; then
     echo ""
     echo "✅ Debian package built successfully:"
     echo "   ../netsnmp-enterprise_2.0.0_all.deb"

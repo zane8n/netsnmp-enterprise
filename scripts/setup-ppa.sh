@@ -1,60 +1,38 @@
 #!/bin/bash
-# PPA setup and deployment script
+# PPA setup script for NetSnmp Enterprise
 
 set -e
 
-PPA_NAME="netsnmp-enterprise"
-PPA_URL="https://ppa.launchpadcontent.net/ky6/$PPA_NAME/ubuntu"
-DISTRIBUTIONS="focal jammy noble"
+echo "Setting up PPA for NetSnmp Enterprise..."
 
-setup_ppa() {
-    echo "Setting up NetSnmp Enterprise PPA..."
-    
-    # Install required tools
+# Check if required tools are installed
+if ! command -v dput >/dev/null 2>&1; then
+    echo "Installing dput..."
     sudo apt-get update
-    sudo apt-get install -y devscripts debmake dh-make build-essential
-    
-    # Create package source
-    cd packaging/deb
-    
-    # Build source package
-    debuild -S -sa -k$GPG_KEY_ID
-    
-    # Upload to PPA
-    for distro in $DISTRIBUTIONS; do
-        echo "Uploading to $distro..."
-        dput ppa:ky6/$PPA_NAME ../netsnmp-enterprise_2.0.0-1_source.changes
-    done
-    
-    echo "✅ PPA setup completed!"
-    echo "Packages available at: $PPA_URL"
-}
+    sudo apt-get install -y dput devscripts debmake
+fi
 
-add_ppa_to_readme() {
-    cat >> ../../README.md << EOF
+# Create source package
+echo "Creating source package..."
+cd packaging/deb
 
-## Ubuntu/Debian Installation (PPA)
+# Clean previous builds
+rm -rf ../*.deb ../*.buildinfo ../*.changes ../*.dsc ../*.tar.*
 
-\`\`\`bash
-# Add PPA
-sudo add-apt-repository ppa:ky6/netsnmp-enterprise
-sudo apt-get update
+# Build source package
+debuild -S -sa
 
-# Install NetSnmp Enterprise
-sudo apt-get install netsnmp-enterprise
-\`\`\`
-EOF
-}
-
-main() {
-    if [[ -z "$GPG_KEY_ID" ]]; then
-        echo "Error: GPG_KEY_ID environment variable not set"
-        echo "Run: export GPG_KEY_ID=your-key-id"
-        exit 1
-    fi
-    
-    setup_ppa
-    add_ppa_to_readme
-}
-
-main "$@"
+# Check if source package was created
+if [[ -f ../netsnmp-enterprise_2.0.0-1_source.changes ]]; then
+    echo "✅ Source package created successfully"
+    echo ""
+    echo "To upload to PPA:"
+    echo "1. Create a PPA at https://launchpad.net"
+    echo "2. Run: dput ppa:ky6/netsnmp-enterprise ../netsnmp-enterprise_2.0.0-1_source.changes"
+    echo ""
+    echo "Files created:"
+    ls -la ../netsnmp-enterprise_2.0.0-1*
+else
+    echo "❌ Source package creation failed"
+    exit 1
+fi
