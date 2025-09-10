@@ -29,8 +29,8 @@ setup-scripts:
 	@chmod +x packaging/deb/build.sh
 	@chmod +x packaging/rpm/build.sh
 	@chmod +x packaging/arch/build.sh
-	@chmod +x scripts/*.sh
 	@chmod +x src/tests/*.sh
+	@chmod +x scripts/*.sh 2>/dev/null || true
 
 	@echo "Script permissions set"
 

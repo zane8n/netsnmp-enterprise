@@ -1,6 +1,27 @@
 #!/bin/bash
 # Configuration management for NetSnmp Enterprise
 
+# Set test environment if TEST_MODE is set
+if [[ "$TEST_MODE" == "true" ]]; then
+    CONFIG_DIR="${CONFIG_DIR:-/tmp/netsnmp-test/config}"
+    CACHE_DIR="${CACHE_DIR:-/tmp/netsnmp-test/cache}"
+    LOG_FILE="${LOG_FILE:-/tmp/netsnmp-test/netsnmp-test.log}"
+else
+    # Original logic for production
+    if [[ $EUID -eq 0 ]]; then
+        CONFIG_DIR="/etc/netsnmp"
+        CACHE_DIR="/var/cache/netsnmp"
+        LOG_FILE="/var/log/netsnmp.log"
+    else
+        CONFIG_DIR="${HOME}/.config/netsnmp"
+        CACHE_DIR="${HOME}/.cache/netsnmp"
+        LOG_FILE="${HOME}/.cache/netsnmp.log"
+    fi
+fi
+
+CACHE_FILE="${CACHE_DIR}/hosts.cache"
+CONFIG_FILE="${CONFIG_DIR}/netsnmp.conf"
+
 # Initialize configuration
 init_config() {
     mkdir -p "$CONFIG_DIR"

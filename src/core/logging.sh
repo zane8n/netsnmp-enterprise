@@ -1,6 +1,11 @@
 #!/bin/bash
 # Logging functions for NetSnmp Enterprise
 
+# Set test environment if TEST_MODE is set
+if [[ "$TEST_MODE" == "true" ]]; then
+    LOG_FILE="${LOG_FILE:-/tmp/netsnmp-test/netsnmp-test.log}"
+fi
+
 # Initialize logging
 init_logging() {
     mkdir -p "$(dirname "$LOG_FILE")"
