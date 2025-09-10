@@ -245,10 +245,10 @@ generate_uninstall_script() {
 echo "Uninstalling NetSnmp Enterprise..."
 
 # Remove binary
-rm -f /usr/local/bin/netsnmp
+rm -f /usr/bin/netsnmp
 
 # Remove man page
-rm -f /usr/local/share/man/man1/netsnmp.1.gz
+rm -f /usr/share/man/man1/netsnmp.1.gz
 
 # Remove configuration and cache
 read -p "Remove configuration and cache files? [y/N] " -n 1 -r

@@ -124,7 +124,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/netsnmp --update
+ExecStart=/usr/bin/netsnmp --update
 User=root
 Group=root
 
@@ -225,14 +225,14 @@ fi
 print_status "Starting NetSnmp Enterprise uninstallation..."
 
 # Remove binary
-if [[ -f "/usr/local/bin/netsnmp" ]]; then
-    rm -f "/usr/local/bin/netsnmp"
-    print_status "Removed binary: /usr/local/bin/netsnmp"
+if [[ -f "/usr/bin/netsnmp" ]]; then
+    rm -f "/usr/bin/netsnmp"
+    print_status "Removed binary: /usr/bin/netsnmp"
 fi
 
 # Remove man page
-if [[ -f "/usr/local/share/man/man1/netsnmp.1.gz" ]]; then
-    rm -f "/usr/local/share/man/man1/netsnmp.1.gz"
+if [[ -f "/usr/share/man/man1/netsnmp.1.gz" ]]; then
+    rm -f "/usr/share/man/man1/netsnmp.1.gz"
     print_status "Removed man page"
 fi
 
@@ -280,10 +280,10 @@ print_status "Uninstallation completed successfully!"
 EOF
     
     chmod +x "$uninstall_script"
-    mv "$uninstall_script" "/usr/local/bin/netsnmp-uninstall.sh"
+    mv "$uninstall_script" "/usr/bin/netsnmp-uninstall.sh"
     
-    print_status "Uninstall script created: /usr/local/bin/netsnmp-uninstall.sh"
-    print_status "Run: sudo /usr/local/bin/netsnmp-uninstall.sh"
+    print_status "Uninstall script created: /usr/bin/netsnmp-uninstall.sh"
+    print_status "Run: sudo /usr/bin/netsnmp-uninstall.sh"
 }
 
 # Generate uninstall script for --uninstall-script option
@@ -295,10 +295,10 @@ generate_uninstall_script() {
 echo "Uninstalling NetSnmp Enterprise..."
 
 # Remove binary
-rm -f /usr/local/bin/netsnmp
+rm -f /usr/bin/netsnmp
 
 # Remove man page
-rm -f /usr/local/share/man/man1/netsnmp.1.gz
+rm -f /usr/share/man/man1/netsnmp.1.gz
 
 # Remove configuration
 read -p "Remove configuration files? [y/N] " -n 1 -r

@@ -31,11 +31,11 @@ cd netsnmp-enterprise
 make
 
 # Install manually
-sudo cp netsnmp /usr/local/bin/
+sudo cp netsnmp /usr/bin/
 sudo mkdir -p /etc/netsnmp
 sudo cp config/netsnmp.conf /etc/netsnmp/
-sudo cp man/netsnmp.1 /usr/local/share/man/man1/
-sudo gzip /usr/local/share/man/man1/netsnmp.1
+sudo cp man/netsnmp.1 /usr/share/man/man1/
+sudo gzip /usr/share/man/man1/netsnmp.1
 ```
 
 ## Dependencies
@@ -78,8 +78,8 @@ sudo netsnmp --uninstall-script | sudo bash
 ### Manual Uninstallation
 
 ```bash
-sudo rm -f /usr/local/bin/netsnmp
-sudo rm -f /usr/local/share/man/man1/netsnmp.1.gz
+sudo rm -f /usr/bin/netsnmp
+sudo rm -f /usr/share/man/man1/netsnmp.1.gz
 sudo rm -rf /etc/netsnmp
 sudo rm -rf /var/cache/netsnmp
 sudo rm -f /var/log/netsnmp.log

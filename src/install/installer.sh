@@ -5,9 +5,9 @@
 set -e
 
 VERSION="2.0.0"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="/usr/bin"
 CONFIG_DIR="/etc/netsnmp"
-MAN_DIR="/usr/local/share/man/man1"
+MAN_DIR="/usr/share/man/man1"
 CACHE_DIR="/var/cache/netsnmp"
 LOG_DIR="/var/log"
 
