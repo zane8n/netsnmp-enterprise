@@ -5,7 +5,7 @@
 set -e
 
 VERSION="2.0.0"
-AUTHOR="zane8n & NetSnmp Enterprise Team"
+AUTHOR="NetSnmp Enterprise Team"
 LICENSE="GPL-3.0"
 
 # Configuration paths
