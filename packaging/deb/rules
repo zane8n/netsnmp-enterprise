@@ -4,15 +4,17 @@
 	dh $@
 
 override_dh_auto_clean:
-	# Clean build artifacts
+	# Clean build artifacts using our Makefile's clean target
+	$(MAKE) -C ../.. clean-packages
+	$(MAKE) -C ../.. clean
 
 override_dh_auto_build:
-	# Build the application
-	make
+	# Build the application using our Makefile
+	$(MAKE) -C ../.. all
 
 override_dh_auto_install:
-	# Install files to package directory
-	make install DESTDIR=debian/netsnmp-enterprise
+	# Install files to package directory using our Makefile
+	$(MAKE) -C ../.. install DESTDIR=$$(pwd)/debian/netsnmp-enterprise
 
 override_dh_install:
 	# Additional installation steps
@@ -28,8 +30,8 @@ override_dh_installdocs:
 override_dh_fixperms:
 	# Fix permissions
 	dh_fixperms
-	chmod 755 debian/netsnmp-enterprise/usr/local/bin/netsnmp
+	chmod 755 debian/netsnmp-enterprise/usr/bin/netsnmp
 
 override_dh_auto_test:
 	# Run tests
-	make test
+	$(MAKE) -C ../.. test

@@ -1,4 +1,4 @@
-name: Build and Test
+name: Build and Package
 
 on: [push, pull_request]
 
@@ -14,29 +14,66 @@ jobs:
     
     - name: Setup
       run: sudo apt-get update && sudo apt-get install -y make
-
+      
     - name: Build
       run: make
     
     - name: Test
       run: make test
 
-  package:
+  package-deb:
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
-  
+    
     steps:
     - uses: actions/checkout@v3
     
-    - name: Install build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y make debhelper rpm build-essential fakeroot
-        # Add other package-specific dependencies as needed
+    - name: Build Debian package using Docker
+      uses: docker://debian:bullseye
+      with:
+        args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
+    
+    - name: Upload Debian package
+      uses: actions/upload-artifact@v3
+      with:
+        name: deb-package
+        path: packaging/deb/*.deb
 
-    - name: Build packages
+  package-rpm:
+    runs-on: centos-8
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build RPM package
       run: |
-        make deb
+        sudo yum install -y make rpm-build
         make rpm
-        # Add other package formats
+    
+    - name: Upload RPM package
+      uses: actions/upload-artifact@v3
+      with:
+        name: rpm-package
+        path: packaging/rpm/*.rpm
+
+  package-arch:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Arch Linux package using Docker
+      uses: docker://archlinux:latest
+      with:
+        args: sh -c "pacman -Sy --noconfirm make binutils fakeroot && make arch"
+    
+    - name: Upload Arch Linux package
+      uses: actions/upload-artifact@v3
+      with:
+        name: arch-package
+        path: packaging/arch/*.pkg.tar.*
