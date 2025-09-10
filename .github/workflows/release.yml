@@ -3,7 +3,7 @@ name: Release and PPA Deployment
 on:
   release:
     types: [published]
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:  
 
 jobs:
   build-and-release:
@@ -22,10 +22,23 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y make devscripts debhelper dput build-essential
         
-    - name: Build all packages
+    - name: build 
       run: |
-        make packages
-        
+        make 
+
+  package-deb:
+    runs-on: ubuntu-latest
+    needs: build-and-release
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Debian package using Docker
+      uses: docker://debian:bullseye
+      with:
+        args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
