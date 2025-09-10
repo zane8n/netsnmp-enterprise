@@ -18,7 +18,21 @@ override_dh_auto_install:
 override_dh_install:
 	# Additional installation steps
 	dh_install
-
+	
+	if [ -d "debian/netsnmp-enterprise/usr/local/bin" ]; then
+		mkdir -p debian/netsnmp-enterprise/usr/bin
+		mv debian/netsnmp-enterprise/usr/local/bin/* debian/netsnmp-enterprise/usr/bin/
+		rmdir debian/netsnmp-enterprise/usr/local/bin
+	fi
+	
+	if [ -d "debian/netsnmp-enterprise/usr/local/share/man" ]; then
+		mkdir -p debian/netsnmp-enterprise/usr/share/man/man1
+		mv debian/netsnmp-enterprise/usr/local/share/man/man1/* debian/netsnmp-enterprise/usr/share/man/man1/
+		rmdir debian/netsnmp-enterprise/usr/local/share/man/man1
+		rmdir debian/netsnmp-enterprise/usr/local/share/man
+		rmdir debian/netsnmp-enterprise/usr/local/share
+		rmdir debian/netsnmp-enterprise/usr/local
+	fi
 override_dh_installdocs:
 	# Install documentation
 	dh_installdocs
