@@ -3,7 +3,26 @@ name: Release and PPA Deployment
 on:
   release:
     types: [published]
-  workflow_dispatch:  
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: '2.0.0'
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - binary-only
+          - source-only
+      deploy_ppa:
+        description: 'Deploy to PPA?'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   build-and-release:
@@ -11,101 +30,144 @@ jobs:
     permissions:
       contents: write
       packages: write
+    outputs:
+      run_id: ${{ steps.set-outputs.outputs.run_id }}
+      artifact_name: ${{ steps.set-outputs.outputs.artifact_name }}
     
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
     
+    - name: Set outputs
+      id: set-outputs
+      run: |
+        echo "run_id=${{ github.run_id }}" >> $GITHUB_OUTPUT
+        echo "artifact_name=build-artifacts-${{ github.run_id }}" >> $GITHUB_OUTPUT
+    
     - name: Setup build environment
       run: |
         sudo apt-get update
         sudo apt-get install -y make devscripts debhelper dput build-essential
         
-    - name: build 
+    - name: Determine version
+      id: version
       run: |
-        make 
-
-  package-deb:
-    runs-on: ubuntu-latest
-    needs: build-and-release
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Build Debian package using Docker
-      uses: docker://debian:bullseye
-      with:
-        args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
-
-    - name: Create GitHub Release
+        if [ "${{ github.event_name }}" = "release" ]; then
+          echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${{ github.event.inputs.version || '2.0.0' }}" >> $GITHUB_OUTPUT
+          echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Build packages
+      run: |
+        echo "Building version: ${{ steps.version.outputs.VERSION }}"
+        echo "Is release: ${{ steps.version.outputs.IS_RELEASE }}"
+        
+        # Build binary packages if needed
+        if [ "${{ github.event.inputs.build_type || 'all' }}" = "all" ] || [ "${{ github.event.inputs.build_type || 'all' }}" = "binary-only" ]; then
+          echo "Building binary packages..."
+          make packages
+        fi
+        
+        # Build source package if needed
+        if [ "${{ github.event.inputs.build_type || 'all' }}" = "all" ] || [ "${{ github.event.inputs.build_type || 'all' }}" = "source-only" ]; then
+          echo "Building source package for PPA..."
+          cd packaging/deb
+          
+          # Update changelog with the version
+          dch -v "${{ steps.version.outputs.VERSION }}-1" "Build triggered via GitHub Actions"
+          dch -r --distribution stable ""
+          
+          debuild -S -sa
+          cd ..
+        fi
+        
+    - name: Create GitHub Release (only for actual releases)
+      if: steps.version.outputs.IS_RELEASE == 'true'
       uses: softprops/action-gh-release@v1
       with:
         files: |
           packaging/deb/*.deb
         generate_release_notes: true
-        
-    - name: Build source package for PPA
-      run: |
-        cd packaging/deb
-        # Update changelog with release version
-        dch -v "${{ github.event.release.tag_name }}-1" "New upstream release"
-        dch -r --distribution stable ""
-        debuild -S -sa
-        
-    - name: Upload source package to release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          packaging/deb/../*.dsc
-          packaging/deb/../*.tar.*
-          packaging/deb/../*_source.changes
         tag_name: ${{ github.event.release.tag_name }}
         
-    - name: Store source package artifacts
+    - name: Upload artifacts for manual builds and PPA
+      if: steps.version.outputs.IS_RELEASE == 'false' || github.event.inputs.deploy_ppa == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: ppa-source-packages
+        name: ${{ steps.set-outputs.outputs.artifact_name }}
         path: |
+          packaging/deb/*.deb
           packaging/deb/../*.dsc
           packaging/deb/../*.tar.*
           packaging/deb/../*_source.changes
+        retention-days: 1
 
   deploy-ppa:
     runs-on: ubuntu-latest
     needs: build-and-release
-    if: github.event.release.prerelease == false  # Only deploy to PPA for stable releases
+    if: |
+      (github.event_name == 'release' && github.event.release.prerelease == false) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ppa == 'true')
     
     steps:
-    - uses: actions/checkout@v3
-      
-    - name: Download source package artifacts
+    - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
-        name: ppa-source-packages
+        name: ${{ needs.build-and-release.outputs.artifact_name }}
+        path: ./
         
-    - name: Install dput
-      run: sudo apt-get update && sudo apt-get install -y dput
+    - name: Install dput and setup GPG
+      run: |
+        sudo apt-get update && sudo apt-get install -y dput
+        
+    - name: List downloaded files
+      run: ls -la
+      
+    - name: Check for source packages
+      id: check-files
+      run: |
+        if ls *.changes 1> /dev/null 2>&1; then
+          echo "changes_files_exist=true" >> $GITHUB_OUTPUT
+        else
+          echo "changes_files_exist=false" >> $GITHUB_OUTPUT
+          echo "No .changes files found"
+        fi
         
     - name: Deploy to PPA
+      if: steps.check-files.outputs.changes_files_exist == 'true'
       env:
-        PPA_URL: ${{ secrets.PPA_URL }}  # e.g., ppa:zane8n/netsnmp
+        PPA_URL: ${{ secrets.PPA_URL }}
         PPA_GPG_KEY: ${{ secrets.PPA_GPG_KEY }}
         PPA_GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
       run: |
-        if [ -n "$PPA_URL" ] && [ -n "$PPA_GPG_KEY" ]; then
-          echo "Deploying to PPA: $PPA_URL"
-          
+        echo "Deploying to PPA: $PPA_URL"
+        
+        if [ -n "$PPA_GPG_KEY" ]; then
           # Import GPG key
-          echo "$PPA_GPG_KEY" | gpg --import
+          echo "$PPA_GPG_KEY" | gpg --import --batch --yes
           
-          # Sign the changes file
-          debsign -k "$PPA_GPG_KEY" *.changes
-          
-          # Upload to PPA
-          dput "$PPA_URL" *.changes
+          # Sign each changes file
+          for changes_file in *.changes; do
+            echo "Signing $changes_file"
+            debsign -k "$(echo "$PPA_GPG_KEY" | gpg --list-packets | grep 'keyid' | head -1 | cut -d' ' -f4 | tr -d '\n')" "$changes_file"
+          done
         else
-          echo "PPA credentials not set, skipping PPA deployment"
-          echo "Source packages are available in the release artifacts"
+          echo "No GPG key provided, skipping signing"
         fi
+        
+        # Upload to PPA
+        for changes_file in *.changes; do
+          echo "Uploading $changes_file to PPA"
+          dput "$PPA_URL" "$changes_file"
+        done
+        
+    - name: Skip PPA deployment if no files
+      if: steps.check-files.outputs.changes_files_exist == 'false'
+      run: |
+        echo "No source packages found, skipping PPA deployment"
+        echo "Available files:"
+        ls -la
