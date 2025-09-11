@@ -82,11 +82,11 @@ jobs:
           sh -c "
           apt-get update
           apt-get install -y make debhelper devscripts
+          # Create orig tarball from root
+          cd /github/workspace
+          tar czf ../netsnmp-enterprise_${VERSION}.orig.tar.gz --exclude=./packaging/deb --exclude=./.git .
+          # Build package
           cd packaging/deb
-          uscan --download-current-version || {
-            cd ../..
-            tar czf ../netsnmp-enterprise_${VERSION}.orig.tar.gz --exclude=./packaging/deb --exclude=./.git .
-          }
           dch -v '${VERSION}-1' 'Build triggered via NetSnmp Enterprise'
           dch -r --distribution stable ''
           debuild -S -sa
