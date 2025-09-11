@@ -76,19 +76,19 @@ jobs:
       env:
         DEBEMAIL: safarikikandi@gmail.com
         DEBFULLNAME: NetSnmp Enterprise
+        VERSION: ${{ steps.version.outputs.VERSION }}
       with:
-        args: >
+        args: |
           sh -c "
-          apt-get update && 
-          apt-get install -y make debhelper devscripts &&
-          # Create orig tarball first
-          cd packaging/deb &&
-          uscan --download-current-version || 
-          (cd ../.. && tar czf ../netsnmp-enterprise_${{ steps.version.outputs.VERSION }}.orig.tar.gz --exclude=./packaging/deb --exclude=./.git .) &&
-          # Update changelog
-          dch -v '${{ steps.version.outputs.VERSION }}-1' 'Build triggered viaNetSnmp Enterprise' &&
-          dch -r --distribution stable '' &&
-          # Build source package
+          apt-get update
+          apt-get install -y make debhelper devscripts
+          cd packaging/deb
+          uscan --download-current-version || {
+            cd ../..
+            tar czf ../netsnmp-enterprise_${VERSION}.orig.tar.gz --exclude=./packaging/deb --exclude=./.git .
+          }
+          dch -v '${VERSION}-1' 'Build triggered via NetSnmp Enterprise'
+          dch -r --distribution stable ''
           debuild -S -sa
           "
         
