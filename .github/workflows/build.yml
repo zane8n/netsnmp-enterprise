@@ -74,31 +74,15 @@ jobs:
           sh -c "
           apt-get update && 
           apt-get install -y make debhelper devscripts && 
-          echo 'Current directory: ' && pwd
-          echo 'Files in workspace: ' && ls -la /github/workspace/
-          echo 'Files in packaging/deb: ' && ls -la /github/workspace/packaging/deb
           cd /github/workspace/packaging/deb && 
-          echo 'After cd to packaging/deb: ' && pwd
           debuild -S -us -uc
-          echo 'After debuild, files in parent directory: ' && ls -la ../
-          echo 'Files in workspace root: ' && ls -la /github/workspace/
           "
     
-    - name: List all files after build
-      run: |
-        echo "Files in workspace:"
-        ls -la
-        echo "Files in parent directory:"
-        ls -la ../
-    
-    - name: Upload Debian source package
+    - name: Upload from absolute path
       uses: actions/upload-artifact@v4
       with:
         name: deb-source-package
-        path: |
-          ../*.dsc
-          ../*.tar.*
-          ../*_source.changes
+        path: /github/workspace/*.dsc /github/workspace/*.tar.* /github/workspace/*_source.changes
 
   determine-version:
     runs-on: ubuntu-latest
