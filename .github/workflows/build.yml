@@ -61,19 +61,21 @@ jobs:
           sh -c "
           apt-get update && 
           apt-get install -y make debhelper devscripts && 
-          cd packaging/deb && 
-          # Your source package build commands here
-          debuild -S -us -uc
+          # Build in a temporary directory
+          mkdir -p /tmp/source-build && 
+          cp -r /github/workspace/packaging/deb /tmp/source-build/ && 
+          cd /tmp/source-build/deb && 
+          debuild -S -us -uc && 
+          # Copy results to a known location
+          mkdir -p /github/workspace/source-packages && 
+          cp ../*.dsc ../*.tar.* ../*_source.changes /github/workspace/source-packages/
           "
     
     - name: Upload Debian source package
       uses: actions/upload-artifact@v4
       with:
         name: deb-source-package
-        path: |
-          ../*.dsc
-          ../*.tar.*
-          ../*_source.changes
+        path: source-packages/*
 
   # package-rpm:
   #   runs-on: centos-8
