@@ -69,7 +69,7 @@ jobs:
         # Build binary packages if needed
         if [ "${{ github.event.inputs.build_type || 'all' }}" = "all" ] || [ "${{ github.event.inputs.build_type || 'all' }}" = "binary-only" ]; then
           echo "Building binary packages..."
-          make packages
+          make deb
         fi
         
         # Build source package if needed
