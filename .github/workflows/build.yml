@@ -64,6 +64,18 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Fix changelog format
+      run: |
+        cd packaging/deb/debian
+        # Replace $(date -R) with actual date
+        sed -i 's/\$(date -R)/Tue, 01 Jan 2024 12:00:00 +0000/' changelog
+        # Ensure proper changelog format
+        if ! grep -q "urgency=" changelog; then
+          echo "Fixing changelog format..."
+          # Add proper changelog header if missing
+          sed -i '1i\netsnmp-enterprise (2.0.0-1) stable; urgency=medium\n\n  * Build triggered via GitHub Actions\n' changelog
+        fi
+    
     - name: Build Debian source package using Docker
       uses: docker://debian:bullseye
       env:
@@ -75,14 +87,18 @@ jobs:
           apt-get update && 
           apt-get install -y make debhelper devscripts && 
           cd /github/workspace/packaging/deb && 
+          # Build source package
           debuild -S -us -uc
+          # Copy results to a known location
+          mkdir -p /github/workspace/source-packages && 
+          cp ../*.dsc ../*.tar.* ../*_source.changes /github/workspace/source-packages/
           "
     
-    - name: Upload from absolute path
+    - name: Upload Debian source package
       uses: actions/upload-artifact@v4
       with:
         name: deb-source-package
-        path: /github/workspace/*.dsc /github/workspace/*.tar.* /github/workspace/*_source.changes
+        path: source-packages/*
 
   determine-version:
     runs-on: ubuntu-latest
