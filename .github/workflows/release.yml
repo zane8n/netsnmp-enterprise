@@ -56,23 +56,39 @@ jobs:
           echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
         fi
         
-    - name: Build binary packages using Docker (if needed)
+    - name: Build binary packages using Docker
       if: github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'binary-only' || github.event_name == 'release'
       uses: docker://debian:bullseye
-      with:
-        args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
-        
-    - name: Build source package using Docker (if needed)
-      if: github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'source-only' || github.event.inputs.deploy_ppa == 'true'
-      uses: docker://debian:bullseye
+      env:
+        DEBEMAIL: safarikikandi@gmail.com
+        DEBFULLNAME: NetSnmp Enterprise
       with:
         args: >
           sh -c "
           apt-get update && 
-          apt-get install -y make debhelper devscripts && 
+          apt-get install -y make debhelper devscripts &&
+          make deb
+          "
+        
+    - name: Build source package using Docker
+      if: github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'source-only' || github.event.inputs.deploy_ppa == 'true'
+      uses: docker://debian:bullseye
+      env:
+        DEBEMAIL: safarikikandi@gmail.com
+        DEBFULLNAME: NetSnmp Enterprise
+      with:
+        args: >
+          sh -c "
+          apt-get update && 
+          apt-get install -y make debhelper devscripts &&
+          # Create orig tarball first
           cd packaging/deb &&
-          dch -v '${{ steps.version.outputs.VERSION }}-1' 'Build triggered via GitHub Actions' &&
+          uscan --download-current-version || 
+          (cd ../.. && tar czf ../netsnmp-enterprise_${{ steps.version.outputs.VERSION }}.orig.tar.gz --exclude=./packaging/deb --exclude=./.git .) &&
+          # Update changelog
+          dch -v '${{ steps.version.outputs.VERSION }}-1' 'Build triggered viaNetSnmp Enterprise' &&
           dch -r --distribution stable '' &&
+          # Build source package
           debuild -S -sa
           "
         
@@ -95,6 +111,7 @@ jobs:
           ../*.dsc
           ../*.tar.*
           ../*_source.changes
+          ../*.orig.tar.gz
         retention-days: 1
 
   deploy-ppa:
@@ -113,7 +130,7 @@ jobs:
         
     - name: Install dput and setup GPG
       run: |
-        sudo apt-get update && sudo apt-get install -y dput
+        sudo apt-get update && sudo apt-get install -y dput devscripts
         
     - name: List downloaded files
       run: ls -la
@@ -134,6 +151,8 @@ jobs:
         PPA_URL: ${{ secrets.PPA_URL }}
         PPA_GPG_KEY: ${{ secrets.PPA_GPG_KEY }}
         PPA_GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
+        DEBEMAIL: safarikikandi@gmail.com
+        DEBFULLNAME: NetSnmp Enterprise
       run: |
         echo "Deploying to PPA: $PPA_URL"
         
@@ -141,10 +160,14 @@ jobs:
           # Import GPG key
           echo "$PPA_GPG_KEY" | gpg --import --batch --yes
           
+          # Get key ID
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2 | head -1)
+          echo "Using GPG key ID: $KEY_ID"
+          
           # Sign each changes file
           for changes_file in *.changes; do
             echo "Signing $changes_file"
-            debsign -k "$(echo "$PPA_GPG_KEY" | gpg --list-packets | grep 'keyid' | head -1 | cut -d' ' -f4 | tr -d '\n')" "$changes_file"
+            debsign -k "$KEY_ID" "$changes_file"
           done
         else
           echo "No GPG key provided, skipping signing"
