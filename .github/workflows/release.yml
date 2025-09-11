@@ -76,7 +76,6 @@ jobs:
       env:
         DEBEMAIL: safarikikandi@gmail.com
         DEBFULLNAME: NetSnmp Enterprise
-        VERSION: ${{ steps.version.outputs.VERSION }}
       with:
         args: |
           sh -c "
@@ -84,12 +83,13 @@ jobs:
           apt-get install -y make debhelper devscripts
           # Create orig tarball from root
           cd /github/workspace
-          tar czf ../netsnmp-enterprise_${VERSION}.orig.tar.gz --exclude=./packaging/deb --exclude=./.git .
+          tar czf ../netsnmp-enterprise_${{ steps.version.outputs.VERSION }}.orig.tar.gz --exclude=./packaging/deb --exclude=./.git .
           # Build package
           cd packaging/deb
-          dch -v '${VERSION}-1' 'Build triggered via NetSnmp Enterprise'
+          dch -v '${{ steps.version.outputs.VERSION }}-1' 'Build triggered via NetSnmp Enterprise'
           dch -r --distribution stable ''
-          debuild -S -sa
+          # Build without signing (we'll sign later if needed)
+          debuild -S -us -uc
           "
         
     - name: Create GitHub Release (only for actual releases)
