@@ -9,9 +9,17 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version'
+        description: 'Version number (e.g., 2.0.1)'
         required: true
         default: '2.0.0'
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - release
       deploy_ppa:
         description: 'Deploy to PPA?'
         required: true
@@ -27,13 +35,10 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
-    
     - name: Setup
       run: sudo apt-get update && sudo apt-get install -y make
-      
     - name: Build
       run: make
-    
     - name: Test
       run: make test
 
@@ -44,12 +49,10 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
-    
     - name: Build Debian package using Docker
       uses: docker://debian:bullseye
       with:
         args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
-    
     - name: Upload Debian package
       uses: actions/upload-artifact@v4
       with:
@@ -63,19 +66,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
-    
-    - name: Fix changelog format
-      run: |
-        cd packaging/deb/debian
-        # Replace $(date -R) with actual date
-        sed -i 's/\$(date -R)/Tue, 01 Jan 2024 12:00:00 +0000/' changelog
-        # Ensure proper changelog format
-        if ! grep -q "urgency=" changelog; then
-          echo "Fixing changelog format..."
-          # Add proper changelog header if missing
-          sed -i '1i\netsnmp-enterprise (2.0.0-1) stable; urgency=medium\n\n  * Build triggered via GitHub Actions\n' changelog
-        fi
-    
     - name: Build Debian source package using Docker
       uses: docker://debian:bullseye
       env:
@@ -87,18 +77,21 @@ jobs:
           apt-get update && 
           apt-get install -y make debhelper devscripts && 
           cd /github/workspace/packaging/deb && 
-          # Build source package
+          # Generate buildinfo file by building first
           debuild -S -us -uc
-          # Copy results to a known location
-          mkdir -p /github/workspace/source-packages && 
-          cp ../*.dsc ../*.tar.* ../*_source.changes /github/workspace/source-packages/
           "
-    
+    - name: Copy source packages to current directory
+      run: |
+        cp ../*.dsc ../*.tar.* ../*_source.changes ../*.buildinfo ./
     - name: Upload Debian source package
       uses: actions/upload-artifact@v4
       with:
         name: deb-source-package
-        path: source-packages/*
+        path: |
+          *.dsc
+          *.tar.*
+          *_source.changes
+          *.buildinfo
 
   determine-version:
     runs-on: ubuntu-latest
@@ -106,30 +99,32 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
       is_release: ${{ steps.version.outputs.IS_RELEASE }}
+      release_type: ${{ steps.version.outputs.RELEASE_TYPE }}
     steps:
-    - name: Determine version
+    - name: Determine version and type
       id: version
       run: |
-        # For release events, use the tag name (remove 'v' prefix if present)
         if [ "${{ github.event_name }}" = "release" ] && [ -n "${{ github.event.release.tag_name }}" ]; then
+          # For GitHub releases, use the tag name (remove 'v' prefix)
           VERSION="${{ github.event.release.tag_name }}"
-          # Remove 'v' prefix if present
           VERSION="${VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
-        # For workflow_dispatch events, use the input version
-        elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+          echo "RELEASE_TYPE=release" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          # For manual dispatch, use the input version
           VERSION="${{ github.event.inputs.version }}"
-          # Remove 'v' prefix if present
-          VERSION="${VERSION#v}"
+          # Clean up version input (remove any non-numeric/dot characters except for debian revision)
+          VERSION=$(echo "$VERSION" | sed 's/[^0-9.]//g')
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
-        # Fallback: try to get version from git tag or use default
+          echo "RELEASE_TYPE=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
         else
-          # Try to get version from latest tag
-          VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//') || VERSION="2.0.0"
+          # Fallback for other events
+          VERSION="2.0.0"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
+          echo "RELEASE_TYPE=dev" >> $GITHUB_OUTPUT
         fi
         echo "Determined version: $VERSION"
 
@@ -146,23 +141,19 @@ jobs:
       with:
         name: deb-package
         path: .
-        
-    - name: List downloaded files
-      run: find . -name "*.deb" -type f
-      
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
           **/*.deb
         generate_release_notes: true
-        tag_name: ${{ needs.determine-version.outputs.version }}
+        tag_name: v${{ needs.determine-version.outputs.version }}
 
   deploy-ppa:
     runs-on: ubuntu-latest
     needs: determine-version
     if: |
-      (needs.determine-version.outputs.is_release == 'true') ||
+      (needs.determine-version.outputs.release_type == 'release') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ppa == 'true')
     
     steps:
@@ -171,13 +162,8 @@ jobs:
       with:
         name: deb-source-package
         path: .
-        
-    - name: Install dput and devscripts (includes debsign)
+    - name: Install dput and devscripts
       run: sudo apt-get update && sudo apt-get install -y dput devscripts
-        
-    - name: List source files
-      run: ls -la
-        
     - name: Deploy to PPA
       env:
         PPA_URL: ${{ secrets.PPA_URL }}
@@ -188,22 +174,20 @@ jobs:
       run: |
         echo "Deploying to PPA: $PPA_URL"
         
-        # Import and setup GPG key if provided
         if [ -n "$PPA_GPG_KEY" ]; then
           echo "$PPA_GPG_KEY" | gpg --import --batch --yes
-          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2 | head -1)
-          echo "Using GPG key ID: $KEY_ID"
+          # Use fingerprint instead of long key ID
+          KEY_FINGERPRINT=$(gpg --list-secret-keys --with-colons --fingerprint | grep fpr | head -1 | cut -d: -f10)
+          echo "Using GPG key fingerprint: $KEY_FINGERPRINT"
           
-          # Sign each changes file
           for changes_file in *.changes; do
             echo "Signing $changes_file"
-            debsign -k "$KEY_ID" "$changes_file"
+            debsign -k "$KEY_FINGERPRINT" "$changes_file"
           done
         else
           echo "No GPG key provided, skipping signing"
         fi
         
-        # Upload to PPA
         for changes_file in *.changes; do
           echo "Uploading $changes_file to PPA"
           dput "$PPA_URL" "$changes_file"
