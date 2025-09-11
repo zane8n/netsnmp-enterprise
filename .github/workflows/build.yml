@@ -31,6 +31,9 @@ jobs:
     
     - name: Build Debian package using Docker
       uses: docker://debian:bullseye
+      env:
+        DEBEMAIL: safarikikandi@gmail.com
+        DEBFULLNAME: NetSnmp Enterprise
       with:
         args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
     
@@ -39,6 +42,38 @@ jobs:
       with:
         name: deb-package
         path: packaging/deb/*.deb
+
+  package-source-deb:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Debian source package using Docker
+      uses: docker://debian:bullseye
+      env:
+        DEBEMAIL: safarikikandi@gmail.com
+        DEBFULLNAME: NetSnmp Enterprise
+      with:
+        args: |
+          sh -c "
+          apt-get update && 
+          apt-get install -y make debhelper devscripts && 
+          cd packaging/deb && 
+          # Your source package build commands here
+          debuild -S -us -uc
+          "
+    
+    - name: Upload Debian source package
+      uses: actions/upload-artifact@v4
+      with:
+        name: deb-source-package
+        path: |
+          ../*.dsc
+          ../*.tar.*
+          ../*_source.changes
 
   # package-rpm:
   #   runs-on: centos-8
