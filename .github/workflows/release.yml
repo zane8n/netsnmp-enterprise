@@ -45,11 +45,6 @@ jobs:
         echo "run_id=${{ github.run_id }}" >> $GITHUB_OUTPUT
         echo "artifact_name=build-artifacts-${{ github.run_id }}" >> $GITHUB_OUTPUT
     
-    - name: Setup build environment
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y make devscripts debhelper dput build-essential
-        
     - name: Determine version
       id: version
       run: |
@@ -61,29 +56,25 @@ jobs:
           echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
         fi
         
-    - name: Build packages
-      run: |
-        echo "Building version: ${{ steps.version.outputs.VERSION }}"
-        echo "Is release: ${{ steps.version.outputs.IS_RELEASE }}"
+    - name: Build binary packages using Docker (if needed)
+      if: github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'binary-only' || github.event_name == 'release'
+      uses: docker://debian:bullseye
+      with:
+        args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
         
-        # Build binary packages if needed
-        if [ "${{ github.event.inputs.build_type || 'all' }}" = "all" ] || [ "${{ github.event.inputs.build_type || 'all' }}" = "binary-only" ]; then
-          echo "Building binary packages..."
-          make deb
-        fi
-        
-        # Build source package if needed
-        if [ "${{ github.event.inputs.build_type || 'all' }}" = "all" ] || [ "${{ github.event.inputs.build_type || 'all' }}" = "source-only" ]; then
-          echo "Building source package for PPA..."
-          cd packaging/deb
-          
-          # Update changelog with the version
-          dch -v "${{ steps.version.outputs.VERSION }}-1" "Build triggered via GitHub Actions"
-          dch -r --distribution stable ""
-          
+    - name: Build source package using Docker (if needed)
+      if: github.event.inputs.build_type == 'all' || github.event.inputs.build_type == 'source-only' || github.event.inputs.deploy_ppa == 'true'
+      uses: docker://debian:bullseye
+      with:
+        args: >
+          sh -c "
+          apt-get update && 
+          apt-get install -y make debhelper devscripts && 
+          cd packaging/deb &&
+          dch -v '${{ steps.version.outputs.VERSION }}-1' 'Build triggered via GitHub Actions' &&
+          dch -r --distribution stable '' &&
           debuild -S -sa
-          cd ..
-        fi
+          "
         
     - name: Create GitHub Release (only for actual releases)
       if: steps.version.outputs.IS_RELEASE == 'true'
@@ -101,9 +92,9 @@ jobs:
         name: ${{ steps.set-outputs.outputs.artifact_name }}
         path: |
           packaging/deb/*.deb
-          packaging/deb/../*.dsc
-          packaging/deb/../*.tar.*
-          packaging/deb/../*_source.changes
+          ../*.dsc
+          ../*.tar.*
+          ../*_source.changes
         retention-days: 1
 
   deploy-ppa:
