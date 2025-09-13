@@ -11,13 +11,6 @@ on:
       version:
         description: 'Version number (e.g., 2.0.1)'
         required: true
-      release_type:
-        description: 'Release type'
-        required: true
-        default: 'release'
-        type: choice
-        options:
-          - release
       deploy_ppa:
         description: 'Deploy to PPA?'
         required: true
@@ -59,7 +52,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: deb-package
-        path: packaging/deb/*.deb
+        path: "*.deb"
 
   package-source-deb:
     runs-on: ubuntu-latest
@@ -69,9 +62,10 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Get current version from changelog
+    - name: Get current version
       id: get_version
       run: |
+        # Try to get version from changelog or use default
         if [ -f "packaging/deb/debian/changelog" ]; then
           VERSION=$(head -1 packaging/deb/debian/changelog | awk '{print $2}' | tr -d '()' | cut -d- -f1)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
@@ -80,18 +74,29 @@ jobs:
         fi
         echo "Current version: $VERSION"
     
-    - name: Prepare source package
+    - name: Prepare source package directory
       run: |
         mkdir -p source-packages
+        # Create orig tarball
         cd packaging/deb
-        
-        # Update changelog with proper format
-        CURRENT_DATE=$(date -R)
-        sed -i "1s/.*/netsnmp-enterprise (${{ steps.get_version.outputs.VERSION }}-1) unstable; urgency=medium/" debian/changelog
-        sed -i "2s/.*/  * Automated build from GitHub Actions/" debian/changelog
-        sed -i "3s/.*/  -- $DEBFULLNAME <$DEBEMAIL>  $CURRENT_DATE/" debian/changelog
+        mkdir -p ../..
+        tar czf ../../netsnmp-enterprise_${{ steps.get_version.outputs.VERSION }}.orig.tar.gz .
     
-    - name: Build Debian source package using Docker
+    - name: Fix changelog format
+      run: |
+        cd packaging/deb/debian
+        # Replace $(date -R) with actual date
+        CURRENT_DATE=$(date -R)
+        # Create proper changelog format
+        cat > changelog << EOF
+            netsnmp-enterprise (${{ steps.get_version.outputs.VERSION }}-1) unstable; urgency=medium
+
+              * Automated build from GitHub Actions
+
+            -- ${{ env.DEBFULLNAME }} <${{ env.DEBEMAIL }}>  $CURRENT_DATE
+            EOF
+    
+    - name: Build Debian source package
       uses: docker://debian:bullseye
       env:
         DEBEMAIL: ${{ env.DEBEMAIL }}
@@ -102,12 +107,18 @@ jobs:
           apt-get update && 
           apt-get install -y make debhelper devscripts build-essential && 
           cd /github/workspace/packaging/deb && 
-          # Build source package
+          # Build source package with proper orig tarball
           debuild -S -sa -us -uc
-          # Copy results to known location
-          mkdir -p /github/workspace/source-packages && 
-          cp ../*.dsc ../*.tar.* ../*_source.changes /github/workspace/source-packages/
           "
+    
+    - name: Collect source package artifacts
+      run: |
+        cd /github/workspace
+        # Copy all source package files
+        cp -f *.dsc *.tar.* *_source.changes source-packages/ 2>/dev/null || true
+        # List what we found
+        echo "Source package files:"
+        ls -la source-packages/
     
     - name: Upload Debian source package
       uses: actions/upload-artifact@v4
@@ -121,7 +132,6 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
       is_release: ${{ steps.version.outputs.IS_RELEASE }}
-      release_type: ${{ steps.version.outputs.RELEASE_TYPE }}
     steps:
     - name: Download source artifacts to get version info
       uses: actions/download-artifact@v4
@@ -138,7 +148,6 @@ jobs:
           VERSION="${VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
-          echo "RELEASE_TYPE=release" >> $GITHUB_OUTPUT
         elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           # For manual dispatch, use the input version
           VERSION="${{ github.event.inputs.version }}"
@@ -146,10 +155,9 @@ jobs:
           VERSION=$(echo "$VERSION" | sed 's/^v//')
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
-          echo "RELEASE_TYPE=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
         else
           # Auto-increment patch version for main branch pushes
-          if [ -f "downloaded-source/*.dsc" ]; then
+          if ls downloaded-source/*.dsc 1> /dev/null 2>&1; then
             LATEST_DSC=$(ls downloaded-source/*.dsc | head -1)
             BASE_VERSION=$(basename "$LATEST_DSC" | cut -d_ -f2)
             MAJOR=$(echo $BASE_VERSION | cut -d. -f1)
@@ -162,7 +170,6 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
-          echo "RELEASE_TYPE=dev" >> $GITHUB_OUTPUT
         fi
         echo "Determined version: $VERSION"
 
@@ -208,8 +215,10 @@ jobs:
     - name: Prepare for PPA deployment
       run: |
         cd ppa-source
-        # Remove any .buildinfo files that might cause issues
-        rm -f *.buildinfo || true
+        # Remove any problematic files
+        rm -f *.buildinfo *.upload *.dsc.asc *.changes.asc 2>/dev/null || true
+        echo "Files available for PPA deployment:"
+        ls -la
         
     - name: Deploy to PPA
       env:
@@ -230,13 +239,24 @@ jobs:
           
           # Sign the changes file
           CHANGES_FILE=$(ls *.changes | head -1)
-          echo "Signing $CHANGES_FILE"
-          debsign -k "$KEY_FINGERPRINT" "$CHANGES_FILE"
+          if [ -f "$CHANGES_FILE" ]; then
+            echo "Signing $CHANGES_FILE"
+            debsign -k "$KEY_FINGERPRINT" "$CHANGES_FILE"
+          else
+            echo "ERROR: No changes file found for signing!"
+            exit 1
+          fi
         else
           echo "No GPG key provided, skipping signing"
         fi
         
         # Upload to PPA
         CHANGES_FILE=$(ls *.changes | head -1)
-        echo "Uploading $CHANGES_FILE to PPA"
-        dput "$PPA_URL" "$CHANGES_FILE"
+        if [ -f "$CHANGES_FILE" ]; then
+          echo "Uploading $CHANGES_FILE to PPA"
+          dput "$PPA_URL" "$CHANGES_FILE"
+        else
+          echo "ERROR: No changes file found for upload!"
+          ls -la
+          exit 1
+        fi
