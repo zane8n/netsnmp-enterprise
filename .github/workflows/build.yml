@@ -11,20 +11,22 @@ on:
       version:
         description: 'Version number (e.g., 2.0.1)'
         required: true
-        default: '2.0.0'
       release_type:
         description: 'Release type'
         required: true
-        default: 'dev'
+        default: 'release'
         type: choice
         options:
-          - dev
           - release
       deploy_ppa:
         description: 'Deploy to PPA?'
         required: true
-        default: false
+        default: true
         type: boolean
+
+env:
+  DEBEMAIL: safarikikandi@gmail.com
+  DEBFULLNAME: NetSnmp Enterprise
 
 jobs:
   build:
@@ -52,12 +54,12 @@ jobs:
     - name: Build Debian package using Docker
       uses: docker://debian:bullseye
       with:
-        args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && make deb"
+        args: sh -c "apt-get update && apt-get install -y make debhelper devscripts && cd /github/workspace && make deb"
     - name: Upload Debian package
       uses: actions/upload-artifact@v4
       with:
         name: deb-package
-        path: packaging/deb/*.deb
+        path: "*.deb"
 
   package-source-deb:
     runs-on: ubuntu-latest
@@ -67,32 +69,42 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Fix changelog format
+    - name: Get current version from changelog
+      id: get_version
       run: |
-        cd packaging/deb/debian
-        # Replace $(date -R) with actual date
-        sed -i 's/\$(date -R)/Tue, 01 Jan 2024 12:00:00 +0000/' changelog
-        # Ensure proper changelog format
-        if ! grep -q "urgency=" changelog; then
-          echo "Fixing changelog format..."
-          # Add proper changelog header if missing
-          sed -i '1i\netsnmp-enterprise (2.0.0-1) stable; urgency=medium\n\n  * Build triggered via GitHub Actions\n' changelog
+        if [ -f "packaging/deb/debian/changelog" ]; then
+          VERSION=$(head -1 packaging/deb/debian/changelog | awk '{print $2}' | tr -d '()' | cut -d- -f1)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=2.0.0" >> $GITHUB_OUTPUT
         fi
+        echo "Current version: $VERSION"
+    
+    - name: Prepare source package
+      run: |
+        mkdir -p source-packages
+        cd packaging/deb
+        
+        # Update changelog with proper format
+        CURRENT_DATE=$(date -R)
+        sed -i "1s/.*/netsnmp-enterprise (${{ steps.get_version.outputs.VERSION }}-1) unstable; urgency=medium/" debian/changelog
+        sed -i "2s/.*/  * Automated build from GitHub Actions/" debian/changelog
+        sed -i "3s/.*/  -- $DEBFULLNAME <$DEBEMAIL>  $CURRENT_DATE/" debian/changelog
     
     - name: Build Debian source package using Docker
       uses: docker://debian:bullseye
       env:
-        DEBEMAIL: safarikikandi@gmail.com
-        DEBFULLNAME: NetSnmp Enterprise
+        DEBEMAIL: ${{ env.DEBEMAIL }}
+        DEBFULLNAME: ${{ env.DEBFULLNAME }}
       with:
         args: |
           sh -c "
           apt-get update && 
-          apt-get install -y make debhelper devscripts && 
+          apt-get install -y make debhelper devscripts build-essential && 
           cd /github/workspace/packaging/deb && 
           # Build source package
-          debuild -S -us -uc
-          # Copy results to a known location
+          debuild -S -sa -us -uc
+          # Copy results to known location
           mkdir -p /github/workspace/source-packages && 
           cp ../*.dsc ../*.tar.* ../*_source.changes /github/workspace/source-packages/
           "
@@ -111,6 +123,12 @@ jobs:
       is_release: ${{ steps.version.outputs.IS_RELEASE }}
       release_type: ${{ steps.version.outputs.RELEASE_TYPE }}
     steps:
+    - name: Download source artifacts to get version info
+      uses: actions/download-artifact@v4
+      with:
+        name: deb-source-package
+        path: downloaded-source
+        
     - name: Determine version and type
       id: version
       run: |
@@ -124,14 +142,24 @@ jobs:
         elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           # For manual dispatch, use the input version
           VERSION="${{ github.event.inputs.version }}"
-          # Clean up version input (remove any non-numeric/dot characters except for debian revision)
-          VERSION=$(echo "$VERSION" | sed 's/[^0-9.]//g')
+          # Clean up version input
+          VERSION=$(echo "$VERSION" | sed 's/^v//')
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
+          echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
           echo "RELEASE_TYPE=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
         else
-          # Fallback for other events
-          VERSION="2.0.0"
+          # Auto-increment patch version for main branch pushes
+          if [ -f "downloaded-source/*.dsc" ]; then
+            LATEST_DSC=$(ls downloaded-source/*.dsc | head -1)
+            BASE_VERSION=$(basename "$LATEST_DSC" | cut -d_ -f2)
+            MAJOR=$(echo $BASE_VERSION | cut -d. -f1)
+            MINOR=$(echo $BASE_VERSION | cut -d. -f2)
+            PATCH=$(echo $BASE_VERSION | cut -d. -f3)
+            NEW_PATCH=$((PATCH + 1))
+            VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          else
+            VERSION="2.0.1"
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
           echo "RELEASE_TYPE=dev" >> $GITHUB_OUTPUT
@@ -150,92 +178,65 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: deb-package
-        path: .
+        path: release-artifacts
+        
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          **/*.deb
+        files: release-artifacts/**/*.deb
         generate_release_notes: true
         tag_name: v${{ needs.determine-version.outputs.version }}
+        name: Release v${{ needs.determine-version.outputs.version }}
 
   deploy-ppa:
     runs-on: ubuntu-latest
-    needs: determine-version
+    needs: [determine-version, package-source-deb]
     if: |
-      (needs.determine-version.outputs.release_type == 'release') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ppa == 'true')
+      (needs.determine-version.outputs.is_release == 'true') &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.deploy_ppa == 'true')
     
     steps:
     - name: Download source artifacts
       uses: actions/download-artifact@v4
       with:
         name: deb-source-package
-        path: .
+        path: ppa-source
+        
     - name: Install dput and devscripts
       run: sudo apt-get update && sudo apt-get install -y dput devscripts
+    
+    - name: Prepare for PPA deployment
+      run: |
+        cd ppa-source
+        # Remove any .buildinfo files that might cause issues
+        rm -f *.buildinfo || true
+        
     - name: Deploy to PPA
       env:
         PPA_URL: ${{ secrets.PPA_URL }}
         PPA_GPG_KEY: ${{ secrets.PPA_GPG_KEY }}
         PPA_GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
-        DEBEMAIL: safarikikandi@gmail.com
-        DEBFULLNAME: NetSnmp Enterprise
+        DEBEMAIL: ${{ env.DEBEMAIL }}
+        DEBFULLNAME: ${{ env.DEBFULLNAME }}
       run: |
+        cd ppa-source
         echo "Deploying to PPA: $PPA_URL"
         
         if [ -n "$PPA_GPG_KEY" ]; then
           echo "$PPA_GPG_KEY" | gpg --import --batch --yes
-          # Use fingerprint instead of long key ID
+          # Get the key fingerprint
           KEY_FINGERPRINT=$(gpg --list-secret-keys --with-colons --fingerprint | grep fpr | head -1 | cut -d: -f10)
           echo "Using GPG key fingerprint: $KEY_FINGERPRINT"
           
-          for changes_file in *.changes; do
-            echo "Signing $changes_file"
-            debsign -k "$KEY_FINGERPRINT" "$changes_file"
-          done
+          # Sign the changes file
+          CHANGES_FILE=$(ls *.changes | head -1)
+          echo "Signing $CHANGES_FILE"
+          debsign -k "$KEY_FINGERPRINT" "$CHANGES_FILE"
         else
           echo "No GPG key provided, skipping signing"
         fi
         
-        for changes_file in *.changes; do
-          echo "Uploading $changes_file to PPA"
-          dput "$PPA_URL" "$changes_file"
-        done
-  # package-rpm:
-  #   runs-on: centos-8
-  #   needs: build
-  #   if: github.ref == 'refs/heads/main'
-    
-  #   steps:
-  #   - uses: actions/checkout@v3
-    
-  #   - name: Build RPM package
-  #     run: |
-  #       sudo yum install -y make rpm-build
-  #       make rpm
-    
-  #   - name: Upload RPM package
-  #     uses: actions/upload-artifact@v4
-  #     with:
-  #       name: rpm-package
-  #       path: packaging/rpm/*.rpm
-
-  # package-arch:
-  #   runs-on: ubuntu-latest
-  #   needs: build
-  #   if: github.ref == 'refs/heads/main'
-    
-  #   steps:
-  #   - uses: actions/checkout@v3
-    
-  #   - name: Build Arch Linux package using Docker
-  #     uses: docker://archlinux:latest
-  #     with:
-  #       args: sh -c "pacman -Sy --noconfirm make binutils fakeroot && make arch"
-    
-  #   - name: Upload Arch Linux package
-  #     uses: actions/upload-artifact@v4
-  #     with:
-  #       name: arch-package
-  #       path: packaging/arch/*.pkg.tar.*
+        # Upload to PPA
+        CHANGES_FILE=$(ls *.changes | head -1)
+        echo "Uploading $CHANGES_FILE to PPA"
+        dput "$PPA_URL" "$CHANGES_FILE"
