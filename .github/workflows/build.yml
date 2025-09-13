@@ -187,8 +187,6 @@ jobs:
     - name: Prepare for PPA deployment
       run: |
         cd ppa-source
-        # Remove any problematic files
-        rm -f *.buildinfo *.upload *.dsc.asc *.changes.asc 2>/dev/null || true
         echo "Files available for PPA deployment:"
         ls -la
         
@@ -209,11 +207,11 @@ jobs:
           KEY_FINGERPRINT=$(gpg --list-secret-keys --with-colons --fingerprint | grep fpr | head -1 | cut -d: -f10)
           echo "Using GPG key fingerprint: $KEY_FINGERPRINT"
           
-          # Sign the changes file
+          # Sign the changes file - use --no-buildinfo to avoid buildinfo issues
           CHANGES_FILE=$(ls *.changes | head -1)
           if [ -f "$CHANGES_FILE" ]; then
             echo "Signing $CHANGES_FILE"
-            debsign -k "$KEY_FINGERPRINT" "$CHANGES_FILE"
+            debsign -k "$KEY_FINGERPRINT" --no-buildinfo "$CHANGES_FILE"
           else
             echo "ERROR: No changes file found for signing!"
             exit 1
