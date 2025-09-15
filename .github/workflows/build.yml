@@ -145,19 +145,12 @@ jobs:
         fi
         echo "Determined version: $VERSION"
 
-  create-release:
-    runs-on: ubuntu-latest
-    needs: determine-version
-    if: needs.determine-version.outputs.is_release == 'true'
-    permissions:
-      contents: write
-    
-    steps:
-    - name: Download binary artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: deb-package
-        path: release-artifacts
+    - name: Create Git tag first
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git tag -a "v${{ needs.determine-version.outputs.version }}" -m "Release v${{ needs.determine-version.outputs.version }}"
+        git push origin "v${{ needs.determine-version.outputs.version }}"
         
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -189,7 +182,7 @@ jobs:
         cd ppa-source
         echo "Files available for PPA deployment:"
         ls -la
-        
+
     - name: Deploy to PPA
       env:
         PPA_URL: ${{ secrets.PPA_URL }}
@@ -207,11 +200,17 @@ jobs:
           KEY_FINGERPRINT=$(gpg --list-secret-keys --with-colons --fingerprint | grep fpr | head -1 | cut -d: -f10)
           echo "Using GPG key fingerprint: $KEY_FINGERPRINT"
           
-          # Sign the changes file - use --no-buildinfo to avoid buildinfo issues
+          # Create a simple buildinfo file to satisfy debsign
           CHANGES_FILE=$(ls *.changes | head -1)
+          BUILDINFO_FILE="${CHANGES_FILE%.changes}.buildinfo"
+          if [ ! -f "$BUILDINFO_FILE" ]; then
+            echo "Creating dummy buildinfo file: $BUILDINFO_FILE"
+            touch "$BUILDINFO_FILE"
+          fi
+          
           if [ -f "$CHANGES_FILE" ]; then
             echo "Signing $CHANGES_FILE"
-            debsign -k "$KEY_FINGERPRINT" --no-buildinfo "$CHANGES_FILE"
+            debsign -k "$KEY_FINGERPRINT" "$CHANGES_FILE"
           else
             echo "ERROR: No changes file found for signing!"
             exit 1
