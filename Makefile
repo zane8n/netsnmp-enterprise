@@ -13,14 +13,9 @@ BUILD_DATE = $(shell date +%Y-%m-%d)
 all: netsnmp installer
 
 # Build the main executable by bundling all modules
-netsnmp: src/core/main.sh src/core/*.sh
+netsnmp: src/core/main.sh
 	@echo "Building NetSnmp Enterprise $(VERSION)"
-	@cat src/core/main.sh > netsnmp.tmp
-	@for module in src/core/config.sh src/core/scanner.sh src/core/cache.sh src/core/utils.sh src/core/logging.sh; do \
-		sed '1d;$$d' $$module >> netsnmp.tmp; \
-	done
-	@echo "main \"\$$@\"" >> netsnmp.tmp
-	@mv netsnmp.tmp netsnmp
+	@cp src/core/main.sh netsnmp
 	@chmod +x netsnmp
 	@echo "Build complete: netsnmp"
 
