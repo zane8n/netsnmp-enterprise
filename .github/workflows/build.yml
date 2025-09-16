@@ -236,13 +236,13 @@ jobs:
             echo "Signing $CHANGES_FILE"
             # Use expect to handle the passphrase input non-interactively
             /usr/bin/expect << 'EOF'
-                set timeout -1
-                spawn debsign -k "$env(KEY_FINGERPRINT)" "$env(CHANGES_FILE)"
-                expect "Enter passphrase:"
-                send "$env(PPA_GPG_PASSPHRASE)\r"
-                expect eof
-                EOF
-                          else
+                    set timeout -1
+                    spawn debsign -k "$env(KEY_FINGERPRINT)" "$env(CHANGES_FILE)"
+                    expect "Enter passphrase:"
+                    send "$env(PPA_GPG_PASSPHRASE)\r"
+                    expect eof
+                    EOF
+          else
             echo "ERROR: No changes file found for signing!"
             exit 1
           fi
