@@ -192,8 +192,8 @@ jobs:
         name: deb-source-package
         path: ppa-source
         
-    - name: Install dput and devscripts
-      run: sudo apt-get update && sudo apt-get install -y dput devscripts
+    - name: Install dput, devscripts and expect
+      run: sudo apt-get update && sudo apt-get install -y dput devscripts expect
     
     - name: Prepare for PPA deployment
       run: |
@@ -235,15 +235,14 @@ jobs:
           if [ -f "$CHANGES_FILE" ]; then
             echo "Signing $CHANGES_FILE"
             # Use expect to handle the passphrase input non-interactively
-            expect <<EOF
-                spawn debsign -k "$KEY_FINGERPRINT" "$CHANGES_FILE"
+            /usr/bin/expect << 'EOF'
+                set timeout -1
+                spawn debsign -k "$env(KEY_FINGERPRINT)" "$env(CHANGES_FILE)"
                 expect "Enter passphrase:"
-                send "$PPA_GPG_PASSPHRASE\r"
+                send "$env(PPA_GPG_PASSPHRASE)\r"
                 expect eof
-                catch wait result
-                exit [lindex \$result 3]
                 EOF
-          else
+                          else
             echo "ERROR: No changes file found for signing!"
             exit 1
           fi
