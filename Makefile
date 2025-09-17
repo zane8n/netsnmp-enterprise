@@ -1,5 +1,6 @@
 PREFIX ?= /usr
 BINDIR ?= $(PREFIX)/bin
+LIBDIR ?= $(PREFIX)/lib/netsnmp-enterprise
 MANDIR ?= $(PREFIX)/share/man/man1
 CONFDIR ?= /etc/netsnmp
 CACHEDIR ?= /var/cache/netsnmp
@@ -12,23 +13,16 @@ BUILD_DATE = $(shell date +%Y-%m-%d)
 
 all: netsnmp installer
 
-# Build the main executable by bundling all modules
+# Build the main executable with proper module paths
 netsnmp: src/core/main.sh src/core/*.sh
 	@echo "Building NetSnmp Enterprise $(VERSION)"
-	@cat src/core/main.sh > netsnmp.tmp
-	@# Remove the source lines from main.sh
-	@sed '/^source .*/d' netsnmp.tmp > netsnmp.tmp2
-	@mv netsnmp.tmp2 netsnmp.tmp
-	@# Append all module content
-	@for module in src/core/utils.sh src/core/logging.sh src/core/config.sh src/core/cache.sh src/core/scanner.sh; do \
-		echo "# ==== Contents of $$(basename $$module) ====" >> netsnmp.tmp; \
-		sed '1d;$$d' $$module >> netsnmp.tmp; \
-		echo "" >> netsnmp.tmp; \
-	done
-	@echo "main \"\$$@\"" >> netsnmp.tmp
+	@cp src/core/main.sh netsnmp.tmp
+	# Replace source commands with absolute paths
+	@sed -i 's|source "\$$(dirname "\$${BASH_SOURCE\[0\]}")/\(.*\)"|source "/usr/lib/netsnmp-enterprise/\1"|g' netsnmp.tmp
 	@mv netsnmp.tmp netsnmp
 	@chmod +x netsnmp
 	@echo "Build complete: netsnmp"
+
 setup-scripts:
 	@echo "Setting up script permissions..."
 	@chmod +x packaging/deb/build.sh
@@ -36,16 +30,21 @@ setup-scripts:
 	@chmod +x packaging/arch/build.sh
 	@chmod +x src/tests/*.sh
 	@chmod +x scripts/*.sh 2>/dev/null || true
-
 	@echo "Script permissions set"
 
 install: netsnmp
 	@echo "Installing NetSnmp Enterprise to $(DESTDIR)$(PREFIX)"
 	@install -d $(DESTDIR)$(BINDIR)
+	@install -d $(DESTDIR)$(LIBDIR)
 	@install -d $(DESTDIR)$(MANDIR)
 	@install -d $(DESTDIR)$(CONFDIR)
 	@install -d $(DESTDIR)$(CACHEDIR)
 	@install -m 755 netsnmp $(DESTDIR)$(BINDIR)/netsnmp
+	@install -m 644 src/core/utils.sh $(DESTDIR)$(LIBDIR)/utils.sh
+	@install -m 644 src/core/logging.sh $(DESTDIR)$(LIBDIR)/logging.sh
+	@install -m 644 src/core/config.sh $(DESTDIR)$(LIBDIR)/config.sh
+	@install -m 644 src/core/cache.sh $(DESTDIR)$(LIBDIR)/cache.sh
+	@install -m 644 src/core/scanner.sh $(DESTDIR)$(LIBDIR)/scanner.sh
 	@install -m 644 man/netsnmp.1 $(DESTDIR)$(MANDIR)/netsnmp.1
 	@install -m 644 config/netsnmp.conf $(DESTDIR)$(CONFDIR)/netsnmp.conf
 	@echo "Installation complete"
@@ -53,6 +52,7 @@ install: netsnmp
 uninstall:
 	@echo "Uninstalling NetSnmp Enterprise"
 	@rm -f $(DESTDIR)$(BINDIR)/netsnmp
+	@rm -rf $(DESTDIR)$(LIBDIR)
 	@rm -f $(DESTDIR)$(MANDIR)/netsnmp.1.gz
 	@rm -rf $(DESTDIR)$(CONFDIR)
 	@rm -rf $(DESTDIR)$(CACHEDIR)
