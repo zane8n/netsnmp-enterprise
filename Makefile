@@ -16,14 +16,19 @@ all: netsnmp installer
 netsnmp: src/core/main.sh src/core/*.sh
 	@echo "Building NetSnmp Enterprise $(VERSION)"
 	@cat src/core/main.sh > netsnmp.tmp
-	@for module in src/core/config.sh src/core/scanner.sh src/core/cache.sh src/core/utils.sh src/core/logging.sh; do \
+	@# Remove the source lines from main.sh
+	@sed '/^source .*/d' netsnmp.tmp > netsnmp.tmp2
+	@mv netsnmp.tmp2 netsnmp.tmp
+	@# Append all module content
+	@for module in src/core/utils.sh src/core/logging.sh src/core/config.sh src/core/cache.sh src/core/scanner.sh; do \
+		echo "# ==== Contents of $$(basename $$module) ====" >> netsnmp.tmp; \
 		sed '1d;$$d' $$module >> netsnmp.tmp; \
+		echo "" >> netsnmp.tmp; \
 	done
 	@echo "main \"\$$@\"" >> netsnmp.tmp
 	@mv netsnmp.tmp netsnmp
 	@chmod +x netsnmp
 	@echo "Build complete: netsnmp"
-
 setup-scripts:
 	@echo "Setting up script permissions..."
 	@chmod +x packaging/deb/build.sh
