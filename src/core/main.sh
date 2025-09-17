@@ -8,6 +8,18 @@ VERSION="2.0.0"
 AUTHOR="NetSnmp Enterprise Team"
 LICENSE="GPL-3.0"
 
+# Determine module directory
+if [[ -f "/usr/lib/netsnmp-enterprise/utils.sh" ]]; then
+    # Installed system-wide
+    MODULE_DIR="/usr/lib/netsnmp-enterprise"
+elif [[ -f "$(dirname "${BASH_SOURCE[0]}")/utils.sh" ]]; then
+    # Development environment
+    MODULE_DIR="$(dirname "${BASH_SOURCE[0]}")"
+else
+    echo "Error: Cannot find NetSnmp modules" >&2
+    exit 1
+fi
+
 # Configuration paths
 if [[ $EUID -eq 0 ]]; then
     CONFIG_DIR="/etc/netsnmp"
@@ -33,12 +45,12 @@ declare -A CONFIG=(
     ["enable_logging"]="true"
 )
 
-# Source utility functions first
-source "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/logging.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/cache.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/scanner.sh"
+# Source utility functions
+source "${MODULE_DIR}/utils.sh"
+source "${MODULE_DIR}/logging.sh"
+source "${MODULE_DIR}/config.sh"
+source "${MODULE_DIR}/cache.sh"
+source "${MODULE_DIR}/scanner.sh"
 
 # Main function
 main() {
